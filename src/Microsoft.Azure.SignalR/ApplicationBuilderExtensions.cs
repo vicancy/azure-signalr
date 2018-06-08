@@ -25,5 +25,10 @@ namespace Microsoft.AspNetCore.Builder
             app.UseRouter(routes.Build());
             return app;
         }
+
+        public static IApplicationBuilder UseAzureSignalRV2(this IApplicationBuilder app, Action<ServiceRouteBuilder> configure)
+        {
+            return app;
+        }
     }
 }

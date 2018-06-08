@@ -66,5 +66,10 @@ namespace Microsoft.Extensions.DependencyInjection
                 .AddSingleton<IHostedService, HeartBeat>();
             return builder;
         }
+
+        public static ISignalRServerBuilder AddAzureSignalRV2(this ISignalRServerBuilder builder)
+        {
+            return builder;
+        }
     }
 }
