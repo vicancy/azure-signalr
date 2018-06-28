@@ -365,7 +365,10 @@
             if (!response) {
                 return response;
             } else if (typeof response === "string") {
-                return that.json.parse(response);
+                var obj = that.json.parse('[' + response.replace(/}{/g, '},{') + ']');
+                if (obj.length == 1) return obj[0];
+                else
+                    return obj;
             } else {
                 return response;
             }
@@ -1794,6 +1797,16 @@
                     }
 
                     if (data) {
+                        if (Array.isArray(data)) {
+                            for (var i = 0; i < data.length; i++) {
+                                processSingleData(data[i]);
+                            }
+                        } else {
+                            processSingleData(data);
+                        }
+                    }
+
+                    function processSingleData(data) {
                         // data.M is PersistentResponse.Messages
                         if ($.isEmptyObject(data) || data.M) {
                             transportLogic.processMessages(connection, data, onSuccess);
