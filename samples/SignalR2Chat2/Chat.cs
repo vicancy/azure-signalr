@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Web;
 using Microsoft.AspNet.SignalR;
 
@@ -10,7 +11,16 @@ namespace SignalR2Chat2
     {
         public void Hello(string name, string message)
         {
-            Clients.All.hello(name, message);
+            int count = 10;
+            int i = 0;
+            Enumerable.Repeat<Func<int>>(
+                    () =>
+                    {
+                        Clients.All.hello(name, $"round {i}: {message}");
+                        i++;
+                        return i;
+                    }
+                , count).Select(s => s()).ToList();
         }
     }
 }
