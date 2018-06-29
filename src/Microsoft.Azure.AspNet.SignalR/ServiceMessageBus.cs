@@ -77,6 +77,7 @@ namespace Microsoft.Azure.AspNet.SignalR
                     case CommandType.AddToGroup:
                         {
                             // name is hg-{HubName}.{GroupName}, consider the whole as the actual group name
+                            // What if multiple hubs? every hub connection receives the JoinGroupMessage
                             var name = command.Value;
 
                             if (message.Key.StartsWith(ConnectionIdPrefix))
@@ -116,7 +117,7 @@ namespace Microsoft.Azure.AspNet.SignalR
                     await _serviceConnectionManager.WithHub(hubName).WriteAsync(new BroadcastDataMessage(excludedList: GetExcludedIds(message.Filter), payloads: GetPayload(segment)));
                 }
                 // echo case
-                if (message.Key.StartsWith(HubConnectionIdPrefix))
+                else if (message.Key.StartsWith(HubConnectionIdPrefix))
                 {
                     var hubAndConnectionId = message.Key.Substring(HubConnectionIdPrefix.Length);
 
@@ -133,6 +134,49 @@ namespace Microsoft.Azure.AspNet.SignalR
                 else if (message.Key.StartsWith(ConnectionIdPrefix))
                 {
                     await _serviceConnectionManager.WriteAsync(new ConnectionDataMessage(message.Key.Substring(ConnectionIdPrefix.Length), segment));
+                }
+                else if (message.Key.StartsWith(HubUserPrefix))
+                {
+                    // naming: hu-{HubName}.{UserName} 
+                    // HubName can contain '.' and UserName can contain '.'
+                    // How to map it to the User?
+                    // Currently we go through all the possibilities
+                    var result = GetPossibleConnections(message.Key.Substring(HubUserPrefix.Length));
+                    foreach(var pair in result)
+                    {
+                        // For old protocol, it is always single user per message https://github.com/SignalR/SignalR/blob/dev/src/Microsoft.AspNet.SignalR.Core/Infrastructure/Connection.cs#L162
+                        await _serviceConnectionManager.WithHub(pair.Item1).WriteAsync(new UserDataMessage(pair.Item2, GetPayload(segment)));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The qualified name is {HubName}.{OtherName} while both can contain '.', go through every possiblity
+        /// </summary>
+        /// <param name="candidate"></param>
+        /// <returns></returns>
+        private IEnumerable<(string, string)> GetPossibleConnections(string candidate)
+        {
+            var index = candidate.IndexOf('.');
+            if (index == -1)
+            {
+                throw new InvalidDataException($"Message key {candidate} does not contain the required separator '.'");
+            }
+
+            if (_serviceConnectionManager.HubNamesWithDot.Count == 0)
+            {
+                yield return (candidate.Substring(0, index), candidate.Substring(index + 1));
+            }
+            else
+            {
+                // It is rare that hubname contains '.'
+                foreach(var name in _serviceConnectionManager.HubNamesWithDot)
+                {
+                    if (candidate.Length > name.Length + 1 && candidate[name.Length] == '.')
+                    {
+                        yield return (name, candidate.Substring(name.Length + 1));
+                    }
                 }
             }
         }

@@ -8,6 +8,7 @@ using Microsoft.AspNet.SignalR.Hubs;
 
 namespace SignalR2Chat2
 {
+    [HubName("Chat.A")]
     public class Chat : Hub
     {
         public void Hello(string name, string message)

@@ -24,17 +24,17 @@ namespace SignalR2Chat
             Clients.Client(Context.ConnectionId).echo(name, message + " (echo from server)");
         }
 
-        public async void JoinGroup(string name, string groupName)
+        public void JoinGroup(string name, string groupName)
         {
-            await Groups.Add(Context.ConnectionId, groupName);
-            await Clients.Group(groupName).echo("_SYSTEM_", $"{name} joined {groupName} with connectionId {Context.ConnectionId}");
+            Groups.Add(Context.ConnectionId, groupName).Wait();
+            Clients.Group(groupName).echo("_SYSTEM_", $"{name} joined {groupName} with connectionId {Context.ConnectionId}");
         }
 
-        public async void LeaveGroup(string name, string groupName)
+        public void LeaveGroup(string name, string groupName)
         {
-            await Groups.Remove(Context.ConnectionId, groupName);
-            await Clients.Client(Context.ConnectionId).echo("_SYSTEM_", $"{name} leaved {groupName}");
-            await Clients.Group(groupName).echo("_SYSTEM_", $"{name} leaved {groupName}");
+            Groups.Remove(Context.ConnectionId, groupName).Wait();
+            Clients.Client(Context.ConnectionId).echo("_SYSTEM_", $"{name} leaved {groupName}");
+            Clients.Group(groupName).echo("_SYSTEM_", $"{name} leaved {groupName}");
         }
 
         public void SendGroup(string name, string groupName, string message)

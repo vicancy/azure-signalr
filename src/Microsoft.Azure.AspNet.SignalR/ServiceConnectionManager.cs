@@ -14,10 +14,14 @@ namespace Microsoft.Azure.AspNet.SignalR
     internal class ServiceConnectionManager : IServiceConnectionManager
     {
         private Dictionary<string, IServiceConnection> _serviceConnections = new Dictionary<string, IServiceConnection>();
-
+        private HashSet<string> _hubNamesWithDot = new HashSet<string>();
         public void AddConnection(string hubName, IServiceConnection connection)
         {
             _serviceConnections[hubName] = connection;
+            if (hubName.Contains('.'))
+            {
+                _hubNamesWithDot.Add(hubName);
+            }
         }
 
         public Task StartAsync()
@@ -41,6 +45,8 @@ namespace Microsoft.Azure.AspNet.SignalR
 
             return connection;
         }
+
+        public IReadOnlyCollection<string> HubNamesWithDot => _hubNamesWithDot;
     }
 
     internal class ServiceConnectionContainer : IServiceConnection
