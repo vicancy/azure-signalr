@@ -216,7 +216,7 @@
                 // Send to Group/Groups
                 document.getElementById('sendgroup').addEventListener('click', function (event) {
                     if (groupInput.value && messageInput.value) {
-                        connection.server.sendGroup(username, groupOperationInput.value);
+                        connection.server.sendGroup(username, groupInput.value, messageInput.value);
                     }
 
                     messageInput.value = '';
