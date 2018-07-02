@@ -65,7 +65,7 @@ namespace Owin
         private static void StartServiceConnection(HubConfiguration configuration)
         {
             var hubManager = configuration.Resolver.Resolve<IHubManager>();
-            var hubs = hubManager.GetHubs().Select(s => s.HubType.Name).ToList();
+            var hubs = hubManager.GetHubs().Select(s => s.Name).ToList();
             // 1. How to get configurations?
             // 2. How to do authentication?
             // 3. How to do logging?
