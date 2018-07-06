@@ -85,6 +85,7 @@ namespace Owin
             configuration.Resolver.Register(typeof(IMessageBus), () => new ServiceMessageBus(configuration.Resolver));
 
             configuration.Resolver.Register(typeof(ITransportManager), () => new AzureTransportManager());
+            configuration.Resolver.Register(typeof(IServiceProtocol), () => serviceProtocol);
 
             var connectionFactory = new ConnectionFactory(hubs, serviceProtocol, configuration, serviceOptions, new NullLoggerFactory());
 

@@ -35,16 +35,19 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         private readonly IAckHandler _ackHandler;
 
+        private readonly IServiceProtocol _serviceProtocol;
+
         public ServiceMessageBus(IDependencyResolver resolver) : base(resolver)
         {
             _serviceConnectionManager = resolver.Resolve<IServiceConnectionManager>();
             _serializer = resolver.Resolve<JsonSerializer>();
             _ackHandler = resolver.Resolve<IAckHandler>();
+            _serviceProtocol = resolver.Resolve<IServiceProtocol>();
         }
 
         public override async Task Publish(Message message)
         {
-            Dictionary<string, ReadOnlyMemory<byte>> GetPayload(ReadOnlyMemory<byte> data) =>
+            Dictionary<string, ReadOnlyMemory<byte>> GetPayloads(ReadOnlyMemory<byte> data) =>
                 new Dictionary<string, ReadOnlyMemory<byte>>
                 {
                     {"json", data }
@@ -59,15 +62,7 @@ namespace Microsoft.Azure.AspNet.SignalR
                 TotalCount = 1
             };
 
-            // TODO: use MemoryPoolTextWriter
-            ArraySegment<byte> segment;
-            var ms = new MemoryStream();
-            using (var sw = new StreamWriter(ms))
-            {
-                ((IJsonWritable)response).WriteJson(sw);
-                sw.Flush();
-                ms.TryGetBuffer(out segment);
-            }
+            var segment = GetPayload(response);
 
             if (message.IsCommand)
             {
@@ -114,7 +109,7 @@ namespace Microsoft.Azure.AspNet.SignalR
                 if (message.Key.StartsWith(HubPrefix))
                 {
                     var hubName = message.Key.Substring(HubPrefix.Length);
-                    await _serviceConnectionManager.WithHub(hubName).WriteAsync(new BroadcastDataMessage(excludedList: GetExcludedIds(message.Filter), payloads: GetPayload(segment)));
+                    await _serviceConnectionManager.WithHub(hubName).WriteAsync(new BroadcastDataMessage(excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment)));
                 }
                 // echo case
                 else if (message.Key.StartsWith(HubConnectionIdPrefix))
@@ -129,7 +124,7 @@ namespace Microsoft.Azure.AspNet.SignalR
                 }
                 else if (message.Key.StartsWith(HubGroupPrefix))
                 {
-                    await _serviceConnectionManager.WriteAsync(new GroupBroadcastDataMessage(message.Key, excludedList: GetExcludedIds(message.Filter), payloads: GetPayload(segment)));
+                    await _serviceConnectionManager.WriteAsync(new GroupBroadcastDataMessage(message.Key, excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment)));
                 }
                 else if (message.Key.StartsWith(ConnectionIdPrefix))
                 {
@@ -145,10 +140,27 @@ namespace Microsoft.Azure.AspNet.SignalR
                     foreach(var pair in result)
                     {
                         // For old protocol, it is always single user per message https://github.com/SignalR/SignalR/blob/dev/src/Microsoft.AspNet.SignalR.Core/Infrastructure/Connection.cs#L162
-                        await _serviceConnectionManager.WithHub(pair.Item1).WriteAsync(new UserDataMessage(pair.Item2, GetPayload(segment)));
+                        await _serviceConnectionManager.WithHub(pair.Item1).WriteAsync(new UserDataMessage(pair.Item2, GetPayloads(segment)));
                     }
                 }
             }
+        }
+
+        private ReadOnlyMemory<byte> GetPayload(IJsonWritable value)
+        {
+            // TODO: use MemoryPoolTextWriter
+            ArraySegment<byte> segment;
+            var ms = new MemoryStream();
+            using (var sw = new StreamWriter(ms))
+            {
+                value.WriteJson(sw);
+                sw.Flush();
+                ms.TryGetBuffer(out segment);
+            }
+
+            // Reuse ConnectionDataMessage to wrap the payload
+            var message = new ConnectionDataMessage(string.Empty, segment);
+            return _serviceProtocol.GetMessageBytes(message);
         }
 
         /// <summary>
