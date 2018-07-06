@@ -277,6 +277,7 @@
             var url = 'http://localhost:5001/signalr';
             var connection = $.connection;
             var chat = connection.advancedChat;
+            window.console.debug = console.log;
             bindConnectionMessage(chat);
 
             // Start the connection.

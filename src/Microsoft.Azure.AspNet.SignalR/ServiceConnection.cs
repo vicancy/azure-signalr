@@ -306,7 +306,7 @@ namespace Microsoft.Azure.AspNet.SignalR
             return Task.CompletedTask;
         }
 
-        private async Task ProcessOutgoingMessagesAsync(string connectionId)
+        private Task ProcessOutgoingMessagesAsync(string connectionId)
         {
             var dispatcher = new HubDispatcher(_config);
             dispatcher.Initialize(_config.Resolver);
@@ -329,14 +329,14 @@ namespace Microsoft.Azure.AspNet.SignalR
 
                 // TODO: check for errors written to the response
 
-                // Assume OnConnected was raised, send the initialize response
-                await WriteAsync(connectionId, new { S = 1, M = new object[0] });
                 _connections[connectionId] = (AzureTransport)context.Environment[ContextConstants.AzureSignalRTransportKey];
             }
             else
             {
                 // TODO: what do we do here?
             }
+
+            return Task.CompletedTask;
         }
 
         private async Task<bool> HandshakeAsync()
