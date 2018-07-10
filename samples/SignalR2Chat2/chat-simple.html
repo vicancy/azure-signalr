@@ -46,7 +46,7 @@
             // Set initial focus to message input box.
             $('#message').focus();
             // Start the connection.
-            connection.hub.url = url;
+            // connection.hub.url = url;
             connection.hub.logging = true;
             connection.hub.start().done(function () {
                 $('#sendmessage').click(function () {
