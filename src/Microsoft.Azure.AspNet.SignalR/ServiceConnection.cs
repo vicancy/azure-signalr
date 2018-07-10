@@ -39,6 +39,7 @@ namespace Microsoft.Azure.AspNet.SignalR
         private readonly JsonSerializer _serializer;
         private readonly HandshakeRequestMessage _handshakeRequest;
         private readonly HubConfiguration _config;
+        private readonly HubDispatcher _dispatcher;
         private readonly IConnectionFactory _connectionFactory;
         private readonly ILogger _logger;
         private readonly ReadOnlyMemory<byte> _cachedPingBytes;
@@ -70,6 +71,7 @@ namespace Microsoft.Azure.AspNet.SignalR
             _handshakeRequest = new HandshakeRequestMessage(_serviceProtocol.Version);
 
             _serializer = _config.Resolver.Resolve<JsonSerializer>();
+            _dispatcher = _config.Resolver.Resolve<HubDispatcher>();
             _cachedPingBytes = _serviceProtocol.GetMessageBytes(PingMessage.Instance);
         }
 
@@ -308,8 +310,6 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         private Task ProcessOutgoingMessagesAsync(string connectionId)
         {
-            var dispatcher = new HubDispatcher(_config);
-            dispatcher.Initialize(_config.Resolver);
 
             var context = new OwinContext();
             var response = context.Response;
@@ -323,9 +323,9 @@ namespace Microsoft.Azure.AspNet.SignalR
             var hostContext = new HostContext(context.Environment);
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
 
-            if (dispatcher.Authorize(hostContext.Request))
+            if (_dispatcher.Authorize(hostContext.Request))
             {
-                _ = dispatcher.ProcessRequest(hostContext);
+                _ = _dispatcher.ProcessRequest(hostContext);
 
                 // TODO: check for errors written to the response
 

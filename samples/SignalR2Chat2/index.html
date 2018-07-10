@@ -281,7 +281,7 @@
             bindConnectionMessage(chat);
 
             // Start the connection.
-            connection.hub.url = url;
+            // connection.hub.url = url;
             connection.hub.logging = true;
             connection.hub.start().done(function () {
                 onConnected(chat);

@@ -8,11 +8,11 @@ namespace Microsoft.Azure.AspNet.SignalR
     internal class AzureTransport : ITransport
     {
         private readonly TaskCompletionSource<object> _lifetimeTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly ServiceConnection _serviceConnection;
+        private readonly HostContext _context;
 
         public AzureTransport(HostContext context)
         {
-            _serviceConnection = (ServiceConnection)context.Environment[ContextConstants.AzureServiceConnectionKey];
+            _context = context;
             context.Environment[ContextConstants.AzureSignalRTransportKey] = this;
         }
 
@@ -50,7 +50,12 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         public Task Send(object value)
         {
-            return _serviceConnection.WriteAsync(ConnectionId, value);
+            if (_context.Environment.TryGetValue(ContextConstants.AzureServiceConnectionKey, out var connection))
+            {
+                return ((ServiceConnection)connection).WriteAsync(ConnectionId, value);
+            }
+
+            throw new InvalidOperationException("No service connection found when sending message");
         }
 
         public void OnReceived(string value)

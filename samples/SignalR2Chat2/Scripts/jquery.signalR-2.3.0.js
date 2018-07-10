@@ -438,6 +438,34 @@
                 deferred = connection._deferral || $.Deferred(), // Check to see if there is a pre-existing deferral that's being built on, if so we want to keep using it
                 parser = window.document.createElement("a");
 
+            var setConnectionUrl = function(connection, url) {
+                if (connection.url === url && connection.baseUrl) {
+                    // when the url related properties are already set
+                    return;
+                }
+
+                connection.url = url;
+                parser.href = connection.url;
+                if (!parser.protocol || parser.protocol === ":") {
+                    connection.protocol = window.document.location.protocol;
+                    connection.host = parser.host || window.document.location.host;
+                } else {
+                    connection.protocol = parser.protocol;
+                    connection.host = parser.host;
+                }
+
+                connection.baseUrl = connection.protocol + "//" + connection.host;
+
+                // Set the websocket protocol
+                connection.wsProtocol = connection.protocol === "https:" ? "wss://" : "ws://";
+
+                // If the url is protocol relative, prepend the current windows protocol to the url.
+                if (connection.url.indexOf("//") === 0) {
+                    connection.url = window.location.protocol + connection.url;
+                    connection.log("Protocol relative URL detected, normalizing it to '" + connection.url + "'.");
+                }
+            }
+
             connection.lastError = null;
 
             // Persist the deferral so that if start is called multiple times the same deferral is used.
@@ -493,20 +521,7 @@
 
             configureStopReconnectingTimeout(connection);
 
-            // Resolve the full url
-            parser.href = connection.url;
-            if (!parser.protocol || parser.protocol === ":") {
-                connection.protocol = window.document.location.protocol;
-                connection.host = parser.host || window.document.location.host;
-            } else {
-                connection.protocol = parser.protocol;
-                connection.host = parser.host;
-            }
-
-            connection.baseUrl = connection.protocol + "//" + connection.host;
-
-            // Set the websocket protocol
-            connection.wsProtocol = connection.protocol === "https:" ? "wss://" : "ws://";
+            setConnectionUrl(connection, connection.url);
 
             // If jsonp with no/auto transport is specified, then set the transport to long polling
             // since that is the only transport for which jsonp really makes sense.
@@ -514,12 +529,6 @@
             // as demonstrated by Issue #623.
             if (config.transport === "auto" && config.jsonp === true) {
                 config.transport = "longPolling";
-            }
-
-            // If the url is protocol relative, prepend the current windows protocol to the url.
-            if (connection.url.indexOf("//") === 0) {
-                connection.url = window.location.protocol + connection.url;
-                connection.log("Protocol relative URL detected, normalizing it to '" + connection.url + "'.");
             }
 
             if (this.isCrossDomain(connection.url)) {
@@ -681,9 +690,7 @@
                 success: function (result) {
                     var res,
                         keepAliveData,
-                        protocolError,
-                        transports = [],
-                        supportedTransports = [];
+                        protocolError;
 
                     try {
                         res = connection._parseResponse(result);
@@ -693,10 +700,6 @@
                     }
 
                     keepAliveData = connection._.keepAliveData;
-                    connection.appRelativeUrl = res.Url;
-                    connection.id = res.ConnectionId;
-                    connection.token = res.ConnectionToken;
-                    connection.webSocketServerUrl = res.WebSocketServerUrl;
 
                     // The long poll timeout is the ConnectionTimeout plus 10 seconds
                     connection._.pollTimeout = res.ConnectionTimeout * 1000 + 10000; // in ms
@@ -735,26 +738,77 @@
                         return;
                     }
 
-                    $.each(signalR.transports, function (key) {
-                        if ((key.indexOf("_") === 0) || (key === "webSockets" && !res.TryWebSockets)) {
-                            return true;
-                        }
-                        supportedTransports.push(key);
-                    });
+                    if (res.AccessToken) {
+                        // when accessToken is not undefined, consider it as a redirection case
+                        // initiate another call to the service
+                        connection.accessToken = res.AccessToken;
+                        setConnectionUrl(connection, res.Url);
+                        var serviceNegotiateUrl = connection.url + "/negotiate";
+                        var url = signalR.transports._logic.prepareQueryString(connection, serviceNegotiateUrl);
+                        signalR.transports._logic.ajax(connection, {
+                            url: url,
+                            error: function (error, statusText) {
+                                // We don't want to cause any errors if we're aborting our own negotiate request.
+                                if (statusText !== _negotiateAbortText) {
+                                    onFailed(error, connection);
+                                } else {
+                                    // This rejection will noop if the deferred has already been resolved or rejected.
+                                    deferred.reject(signalR._.error(resources.stoppedWhileNegotiating, null /* error */, connection._.negotiateRequest));
+                                }
+                            },
+                            success: function (result) {
+                                var serverResponse;
 
-                    if ($.isArray(config.transport)) {
-                        $.each(config.transport, function (_, transport) {
-                            if ($.inArray(transport, supportedTransports) >= 0) {
-                                transports.push(transport);
-                            }
+                                try {
+                                    serverResponse = connection._parseResponse(result);
+                                } catch (error) {
+                                    onFailed(signalR._.error(resources.errorParsingNegotiateResponse, error), connection);
+                                    return;
+                                }
+
+                                connection.appRelativeUrl = serverResponse.Url;
+                                connection.id = serverResponse.ConnectionId;
+                                connection.token = serverResponse.ConnectionToken;
+                                connection.webSocketServerUrl = serverResponse.WebSocketServerUrl;
+                                var trans = getTransports(serverResponse);
+                                initialize(trans);
+                            },
+                            headers: { "Authorization": "Bearer " + connection.accessToken }
                         });
-                    } else if (config.transport === "auto") {
-                        transports = supportedTransports;
-                    } else if ($.inArray(config.transport, supportedTransports) >= 0) {
-                        transports.push(config.transport);
+                    } else {
+                        connection.appRelativeUrl = res.Url;
+                        connection.id = res.ConnectionId;
+                        connection.token = res.ConnectionToken;
+                        connection.webSocketServerUrl = res.WebSocketServerUrl;
+                        var trans = getTransports(res);
+                        initialize(trans);
                     }
 
-                    initialize(transports);
+                    function getTransports(res) {
+                        var transports = [],
+                            supportedTransports = [];
+
+                        $.each(signalR.transports, function (key) {
+                            if ((key.indexOf("_") === 0) || (key === "webSockets" && !res.TryWebSockets)) {
+                                return true;
+                            }
+                            supportedTransports.push(key);
+                        });
+
+                        if ($.isArray(config.transport)) {
+                            $.each(config.transport, function (_, transport) {
+                                if ($.inArray(transport, supportedTransports) >= 0) {
+                                    transports.push(transport);
+                                }
+                            });
+                        } else if (config.transport === "auto") {
+                            transports = supportedTransports;
+                        } else if ($.inArray(config.transport, supportedTransports) >= 0) {
+                            transports.push(config.transport);
+                        }
+
+                        return transports;
+                    }
                 }
             });
 
@@ -1334,6 +1388,13 @@
             url += "?" + qs;
             url = transportLogic.prepareQueryString(connection, url);
 
+            // With sse or ws, access_token in request header is not supported
+            if (connection.transport && connection.accessToken) {
+                if (connection.transport.name === "serverSentEvents" || connection.transport.name === "webSockets") {
+                    url += "&access_token=" + window.encodeURIComponent(connection.accessToken);
+                }
+            }
+
             if (!ajaxPost) {
                 url += "&tid=" + Math.floor(Math.random() * 11);
             }
@@ -1378,6 +1439,7 @@
                 url: url,
                 type: connection.ajaxDataType === "jsonp" ? "GET" : "POST",
                 contentType: signalR._.defaultContentType,
+                headers: connection.accessToken ? { "Authorization": "Bearer " + connection.accessToken } : {},
                 data: {
                     data: payload
                 },
@@ -1426,7 +1488,8 @@
                 url: url,
                 async: async,
                 timeout: 1000,
-                type: "POST"
+                type: "POST",
+                headers: connection.accessToken ? { "Authorization": "Bearer " + connection.accessToken } : {}
             });
 
             connection.log("Fired ajax abort async = " + async + ".");
@@ -1448,6 +1511,7 @@
 
             connection._.startRequest = transportLogic.ajax(connection, {
                 url: getAjaxUrl(connection, "/start"),
+                headers: connection.accessToken ? { "Authorization": "Bearer " + connection.accessToken } : {},
                 success: function (result, statusText, xhr) {
                     var data;
 
@@ -2385,6 +2449,7 @@
                         contentType: signalR._.defaultContentType,
                         data: postData,
                         timeout: connection._.pollTimeout,
+                        headers: connection.accessToken ? { "Authorization": "Bearer " + connection.accessToken } : {},
                         success: function (result) {
                             var minData,
                                 delay = 0,

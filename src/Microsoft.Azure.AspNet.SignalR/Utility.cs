@@ -40,6 +40,12 @@ namespace Microsoft.Azure.AspNet.SignalR
             (Endpoint, AccessKey) = ParseConnectionString(connectionString);
         }
 
+        public string GenerateClientAccessToken(IEnumerable<Claim> claims = null,
+            TimeSpan? lifetime = null)
+        {
+            return InternalGenerateAccessToken(GetClientEndpoint(), claims, lifetime ?? AccessTokenLifetime);
+        }
+
         public string GenerateServerAccessToken(string hubName, string userId, TimeSpan? lifetime = null)
         {
             IEnumerable<Claim> claims = null;
@@ -97,12 +103,12 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         public string GetServerEndpoint(string hubName)
         {
-            return $"ws://{Endpoint}:{ServerPort}/v2/server/?hub={hubName.ToLower()}";
+            return $"{Endpoint}:{ServerPort}/v2/server/?hub={hubName.ToLower()}";
         }
 
-        public string GetClientEndpoint(string hubName)
+        public string GetClientEndpoint()
         {
-            return $"ws://{Endpoint}:{ClientPort}/";
+            return $"{Endpoint}:{ClientPort}/v2/client";
         }
 
     }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.AspNet.SignalR;
+using Microsoft.AspNet.SignalR.Configuration;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Messaging;
@@ -11,7 +12,6 @@ using Microsoft.Azure.SignalR.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Owin
 {
@@ -58,7 +58,9 @@ namespace Owin
 
         private static void RunAzureSignalRCore(IAppBuilder builder, HubConfiguration configuration)
         {
-            builder.RunSignalR(configuration);
+            var hubDispatcher = new ServiceHubDispatcher(configuration);
+            configuration.Resolver.Register(typeof(HubDispatcher), () => hubDispatcher);
+            builder.RunSignalR(typeof(HubDispatcher), configuration);
             StartServiceConnection(configuration);
         }
 
@@ -71,13 +73,14 @@ namespace Owin
             // 3. How to do logging?
 
             // TODO: use local key vault as fallback
-            var serviceOptions = new ServiceOptions { ConnectionString = "Endpoint=localhost;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;" };
+            var serviceOptions = new ServiceOptions { ConnectionString = "Endpoint=http://localhost;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;" };
 
             var serviceProtocol = new ServiceProtocol();
-
             // share the same object all through
             var scm = new ServiceConnectionManager();
+            var endpoint = new ServiceEndpoint(serviceOptions);
 
+            configuration.Resolver.Register(typeof(ServiceEndpoint), () => endpoint);
             configuration.Resolver.Register(typeof(IServiceConnectionManager), () => scm);
 
             configuration.Resolver.Register(typeof(IProtectedData), () => new EmptyProtectedData());
