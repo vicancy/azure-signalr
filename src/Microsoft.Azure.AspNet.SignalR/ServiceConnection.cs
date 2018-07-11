@@ -97,7 +97,8 @@ namespace Microsoft.Azure.AspNet.SignalR
                 _serializer.Serialize(new JsonTextWriter(sw), value);
                 sw.Flush();
                 ms.TryGetBuffer(out var buffer);
-                await WriteAsync(new ConnectionDataMessage(connectionId, buffer.AsMemory()));
+                var wrapped = new ConnectionDataMessage(string.Empty, buffer.AsMemory());
+                await WriteAsync(new ConnectionDataMessage(connectionId, _serviceProtocol.GetMessageBytes(wrapped)));
             }
         }
 
