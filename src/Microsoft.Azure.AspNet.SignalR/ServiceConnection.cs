@@ -4,6 +4,7 @@
 using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hosting;
 using Microsoft.AspNet.SignalR.Hubs;
+using Microsoft.AspNet.SignalR.Owin;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Azure.SignalR;
 using Microsoft.Azure.SignalR.Protocol;
@@ -16,7 +17,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipelines;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Claims;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,6 +29,14 @@ namespace Microsoft.Azure.AspNet.SignalR
 {
     internal class ServiceConnection : IServiceConnection
     {
+        private static readonly string[] SystemClaims =
+        {
+            "aud", // Audience claim, used by service to make sure token is matched with target resource.
+            "exp", // Expiration time claims. A token is valid only before its expiration time.
+            "iat", // Issued At claim. Added by default. It is not validated by service.
+            "nbf"  // Not Before claim. Added by default. It is not validated by service.
+        };
+
         private static readonly TimeSpan DefaultHandshakeTimeout = TimeSpan.FromSeconds(15);
         // Service ping rate is 15 sec; this is 2 times that.
         private static readonly TimeSpan DefaultServiceTimeout = TimeSpan.FromSeconds(30);
@@ -282,7 +294,7 @@ namespace Microsoft.Azure.AspNet.SignalR
         private Task OnConnectedAsync(OpenConnectionMessage message)
         {
             // Writing from the application to the service
-            _ = ProcessOutgoingMessagesAsync(message.ConnectionId);
+            _ = ProcessOutgoingMessagesAsync(message);
 
             return Task.CompletedTask;
         }
@@ -309,32 +321,41 @@ namespace Microsoft.Azure.AspNet.SignalR
             return Task.CompletedTask;
         }
 
-        private Task ProcessOutgoingMessagesAsync(string connectionId)
+        private Task ProcessOutgoingMessagesAsync(OpenConnectionMessage message)
         {
-
+            var connectionId = message.ConnectionId;
             var context = new OwinContext();
             var response = context.Response;
             var request = context.Request;
+
+            var user = new ClaimsPrincipal();
+            user.AddIdentity(IsAuthenticatedUser(message.Claims)
+                ? new ClaimsIdentity(message.Claims, "Bearer")
+                : new ClaimsIdentity());
+            request.User = user;
+
             response.Body = Stream.Null;
             request.Path = new PathString("/");
 
             // TODO: hub name
-            request.QueryString = new QueryString($"connectionToken={connectionId}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
+            request.QueryString = new QueryString($"connectionToken={connectionId}:{user.Identity.Name}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
 
             var hostContext = new HostContext(context.Environment);
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
 
             if (_dispatcher.Authorize(hostContext.Request))
             {
+                // ProcessRequest checks if the connectionToken matches "{connectionid}:{userName}" format with context.User
                 _ = _dispatcher.ProcessRequest(hostContext);
 
                 // TODO: check for errors written to the response
-
                 _connections[connectionId] = (AzureTransport)context.Environment[ContextConstants.AzureSignalRTransportKey];
             }
             else
             {
+                // This happens when hub is not found
                 // TODO: what do we do here?
+                Debug.Fail("Unauthorized");
             }
 
             return Task.CompletedTask;
@@ -538,6 +559,22 @@ namespace Microsoft.Azure.AspNet.SignalR
             {
                 Log.FailedToCleanupConnections(_logger, ex);
             }
+        }
+
+        private static bool IsAuthenticatedUser(Claim[] claims)
+        {
+            if (claims?.Length > 0)
+            {
+                foreach (var claim in claims)
+                {
+                    if (!SystemClaims.Contains(claim.Type))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static class Log
