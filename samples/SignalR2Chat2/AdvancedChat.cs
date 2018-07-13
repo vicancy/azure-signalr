@@ -7,6 +7,7 @@ using System.Web;
 
 namespace SignalR2Chat
 {
+    [Authorize(Roles = "Admin")]
     public class AdvancedChat : Hub
     {
         public override Task OnConnected()

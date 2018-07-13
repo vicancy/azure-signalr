@@ -34,7 +34,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.Azure.SignalR.Tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.Azure.SignalR.Protocols.Tests", "test\Microsoft.Azure.SignalR.Protocols.Tests\Microsoft.Azure.SignalR.Protocols.Tests.csproj", "{E2094C87-C0F2-471D-A399-0B78CC32C1AA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microsoft.Azure.AspNet.SignalR", "src\Microsoft.Azure.AspNet.SignalR\Microsoft.Azure.AspNet.SignalR.csproj", "{A8E6A862-8621-4F4E-8E10-3AF8D6F00882}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.Azure.AspNet.SignalR", "src\Microsoft.Azure.AspNet.SignalR\Microsoft.Azure.AspNet.SignalR.csproj", "{A8E6A862-8621-4F4E-8E10-3AF8D6F00882}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SignalR2Chat2", "samples\SignalR2Chat2\SignalR2Chat2.csproj", "{D69C53B2-BB6E-4753-A98D-2D80733CFD43}"
 EndProject

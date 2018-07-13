@@ -29,7 +29,6 @@
     <script type="text/javascript">
         $(function () {
             // Declare a proxy to reference the hub.
-            var url = 'http://localhost:5001/signalr';
             var connection = $.connection;
             var chat = connection["Chat.A"];
             // Create a function that the hub can call to broadcast messages.
@@ -46,15 +45,23 @@
             // Set initial focus to message input box.
             $('#message').focus();
             // Start the connection.
-            // connection.hub.url = url;
-            connection.hub.logging = true;
-            connection.hub.start().done(function () {
-                $('#sendmessage').click(function () {
-                    // Call the Send method on the hub.
-                    chat.server.hello($('#displayname').val(), $('#message').val());
-                    // Clear text box and reset focus for next comment.
-                    $('#message').val('').focus();
-                });
+            var user = $('#displayname').val();
+            var role = 'Admin';
+            var promptRoleMessage = 'Enter your role (Only Admin can get auth)';
+            role = prompt(promptRoleMessage, role);
+            $.ajax({
+                url: '/api/cookie/login?username=' + user + '&role=' + role,
+                success: function (data, status) {
+                    connection.hub.logging = true;
+                    connection.hub.start().done(function () {
+                        $('#sendmessage').click(function () {
+                            // Call the Send method on the hub.
+                            chat.server.hello($('#message').val());
+                            // Clear text box and reset focus for next comment.
+                            $('#message').val('').focus();
+                        });
+                    })
+                }
             });
         });
     </script>

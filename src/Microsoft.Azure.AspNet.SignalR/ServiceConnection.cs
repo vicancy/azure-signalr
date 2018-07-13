@@ -337,8 +337,8 @@ namespace Microsoft.Azure.AspNet.SignalR
             response.Body = Stream.Null;
             request.Path = new PathString("/");
 
-            // TODO: hub name
-            request.QueryString = new QueryString($"connectionToken={connectionId}:{user.Identity.Name}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
+            var userToken = string.IsNullOrEmpty(user.Identity.Name) ? string.Empty : ":" + user.Identity.Name;
+            request.QueryString = new QueryString($"connectionToken={connectionId}{userToken}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
 
             var hostContext = new HostContext(context.Environment);
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
@@ -349,6 +349,11 @@ namespace Microsoft.Azure.AspNet.SignalR
                 _ = _dispatcher.ProcessRequest(hostContext);
 
                 // TODO: check for errors written to the response
+                if (hostContext.Response.StatusCode != 200)
+                {
+                    Debug.Fail("Response statuscode is " + hostContext.Response.StatusCode);
+                }
+
                 _connections[connectionId] = (AzureTransport)context.Environment[ContextConstants.AzureSignalRTransportKey];
             }
             else

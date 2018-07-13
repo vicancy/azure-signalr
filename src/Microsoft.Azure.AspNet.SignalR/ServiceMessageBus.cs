@@ -176,21 +176,16 @@ namespace Microsoft.Azure.AspNet.SignalR
                 throw new InvalidDataException($"Message key {candidate} does not contain the required separator '.'");
             }
 
-            if (_serviceConnectionManager.HubNamesWithDot.Count == 0)
+            // It is rare that hubname contains '.'
+            foreach (var name in _serviceConnectionManager.HubNamesWithDot)
             {
-                yield return (candidate.Substring(0, index), candidate.Substring(index + 1));
-            }
-            else
-            {
-                // It is rare that hubname contains '.'
-                foreach(var name in _serviceConnectionManager.HubNamesWithDot)
+                if (candidate.Length > name.Length + 1 && candidate[name.Length] == '.')
                 {
-                    if (candidate.Length > name.Length + 1 && candidate[name.Length] == '.')
-                    {
-                        yield return (name, candidate.Substring(name.Length + 1));
-                    }
+                    yield return (name, candidate.Substring(name.Length + 1));
                 }
             }
+
+            yield return (candidate.Substring(0, index), candidate.Substring(index + 1));
         }
 
         private IReadOnlyList<string> GetExcludedIds(string filter)

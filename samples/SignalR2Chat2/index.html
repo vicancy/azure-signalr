@@ -92,13 +92,6 @@
 
             // Get the user name and store it to prepend to messages.
             var authType = "cookie";
-            do {
-                authType = prompt("Choose auth type: cookie / jwt", authType);
-                if (authType != "cookie" && authType != "jwt") {
-                    authType = '';
-                }
-            } while (!authType)
-
             var username = `${authType}-` + generateRandomName();
             var promptMessage = `Enter your name (Only starting with ${authType} can get auth):`;
             var role = "Admin";
@@ -274,17 +267,20 @@
             }
 
             // Declare a proxy to reference the hub.
-            var url = 'http://localhost:5001/signalr';
             var connection = $.connection;
             var chat = connection.advancedChat;
             window.console.debug = console.log;
             bindConnectionMessage(chat);
 
-            // Start the connection.
-            // connection.hub.url = url;
-            connection.hub.logging = true;
-            connection.hub.start().done(function () {
-                onConnected(chat);
+            var promptRoleMessage = 'Enter your role (Only Admin can get auth)';
+            $.ajax({
+                url: '/api/cookie/login?username=' + username + '&role=' + role,
+                success: function (data, status) {
+                    connection.hub.logging = true;
+                    connection.hub.start().done(function () {
+                        onConnected(chat);
+                    })
+                }
             });
         });
     </script>
