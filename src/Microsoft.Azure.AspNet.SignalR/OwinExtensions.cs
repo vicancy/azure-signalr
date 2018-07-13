@@ -6,12 +6,17 @@ using Microsoft.AspNet.SignalR.Configuration;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Messaging;
+using Microsoft.AspNet.SignalR.Tracing;
 using Microsoft.AspNet.SignalR.Transports;
 using Microsoft.Azure.AspNet.SignalR;
 using Microsoft.Azure.SignalR.Protocol;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Web.Configuration;
 
 namespace Owin
 {
@@ -53,7 +58,7 @@ namespace Owin
 
         private static void RedirectToService(IAppBuilder builder)
         {
-            // TODO: return negotiate response through Middleware
+            Debug.Fail("This can never be reached");
         }
 
         private static void RunAzureSignalRCore(IAppBuilder builder, HubConfiguration configuration)
@@ -61,38 +66,41 @@ namespace Owin
             var hubDispatcher = new ServiceHubDispatcher(configuration);
             configuration.Resolver.Register(typeof(HubDispatcher), () => hubDispatcher);
             builder.RunSignalR(typeof(HubDispatcher), configuration);
-            StartServiceConnection(configuration);
-        }
 
-        private static void StartServiceConnection(HubConfiguration configuration)
-        {
-            var hubManager = configuration.Resolver.Resolve<IHubManager>();
-            var hubs = hubManager.GetHubs().Select(s => s.Name).ToList();
-            // 1. How to get configurations?
-            // 2. How to do authentication?
-            // 3. How to do logging?
-
-            // TODO: use local key vault as fallback
-            var serviceOptions = new ServiceOptions { ConnectionString = "Endpoint=http://localhost;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;" };
+            // share the same object all through
+            var serviceOptions = new ServiceOptions
+            {
+                ConnectionString = WebConfigurationManager.ConnectionStrings[ServiceOptions.ConnectionStringDefaultKey].ConnectionString,
+            };
 
             var serviceProtocol = new ServiceProtocol();
-            // share the same object all through
             var scm = new ServiceConnectionManager();
             var endpoint = new ServiceEndpoint(serviceOptions);
+            var provider = new EmptyProtectedData();
 
             configuration.Resolver.Register(typeof(ServiceEndpoint), () => endpoint);
             configuration.Resolver.Register(typeof(IServiceConnectionManager), () => scm);
-
-            configuration.Resolver.Register(typeof(IProtectedData), () => new EmptyProtectedData());
-
+            configuration.Resolver.Register(typeof(IProtectedData), () => provider);
             configuration.Resolver.Register(typeof(IMessageBus), () => new ServiceMessageBus(configuration.Resolver));
-
             configuration.Resolver.Register(typeof(ITransportManager), () => new AzureTransportManager());
             configuration.Resolver.Register(typeof(IServiceProtocol), () => serviceProtocol);
 
-            var connectionFactory = new ConnectionFactory(hubs, serviceProtocol, configuration, serviceOptions, new NullLoggerFactory());
+            ILoggerFactory logger;
+            var traceManager = configuration.Resolver.Resolve<ITraceManager>();
+            if (traceManager != null)
+            {
+                logger = new TraceManagerLoggerFactory(traceManager);
+            }
+            else
+            {
+                logger = new NullLoggerFactory();
+            }
 
-            _ = connectionFactory.StartAsync();
+            var hubManager = configuration.Resolver.Resolve<IHubManager>();
+            var hubs = hubManager.GetHubs().Select(s => s.Name).ToList();
+
+            // Start the server->service connection asynchronously 
+            _ = new ConnectionFactory(hubs, serviceProtocol, configuration, serviceOptions, logger).StartAsync();
         }
     }
 }

@@ -22,4 +22,9 @@
     <ProjectReference Include="..\Microsoft.Azure.SignalR.Protocols\Microsoft.Azure.SignalR.Protocols.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Web" />
+  </ItemGroup>
+
 </Project>

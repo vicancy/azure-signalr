@@ -19,6 +19,11 @@ namespace Microsoft.Azure.AspNet.SignalR
         private static readonly char[] PropertySeparator = { ';' };
         private static readonly char[] KeyValueSeparator = { '=' };
 
+        private static readonly string ConnectionStringNotFound =
+            "No connection string was specified. " +
+            $"Please specify a configuration entry for {ServiceOptions.ConnectionStringDefaultKey}, " +
+            "or explicitly pass one using IServiceCollection.AddAzureSignalR(connectionString) in Startup.ConfigureServices.";
+
         private static readonly string MissingRequiredProperty =
             $"Connection string missing required properties {EndpointProperty} and {AccessKeyProperty}.";
 
@@ -32,7 +37,7 @@ namespace Microsoft.Azure.AspNet.SignalR
             var connectionString = options.ConnectionString;
             if (connectionString == null)
             {
-                throw new ArgumentNullException(nameof(connectionString));
+                throw new ArgumentException(ConnectionStringNotFound);
             }
 
             AccessTokenLifetime = options.AccessTokenLifetime;
