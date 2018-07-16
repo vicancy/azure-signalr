@@ -4,7 +4,6 @@
 using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hosting;
 using Microsoft.AspNet.SignalR.Hubs;
-using Microsoft.AspNet.SignalR.Owin;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Azure.SignalR;
 using Microsoft.Azure.SignalR.Protocol;
@@ -20,14 +19,13 @@ using System.IO.Pipelines;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Claims;
-using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microsoft.Azure.AspNet.SignalR
 {
-    internal class ServiceConnection : IServiceConnection
+    internal partial class ServiceConnection : IServiceConnection
     {
         private static readonly string[] SystemClaims =
         {
@@ -580,113 +578,6 @@ namespace Microsoft.Azure.AspNet.SignalR
             }
 
             return false;
-        }
-
-        private static class Log
-        {
-            public static void FailedToWrite(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void FailedToConnect(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void ErrorProcessingMessages(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void ConnectionDropped(ILogger logger, string serviceConnectionId, Exception exception)
-            {
-            }
-
-            public static void FailedToCleanupConnections(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void ErrorSendingMessage(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void SendLoopStopped(ILogger logger, string connectionId, Exception exception)
-            {
-            }
-
-            public static void ApplicaitonTaskFailed(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void FailToWriteMessageToApplication(ILogger logger, string connectionId, Exception exception)
-            {
-            }
-
-            public static void ReceivedMessageForNonExistentConnection(ILogger logger, string connectionId)
-            {
-            }
-
-            public static void ConnectedStarting(ILogger logger, string connectionId)
-            {
-            }
-
-            public static void ConnectedEnding(ILogger logger, string connectionId)
-            {
-            }
-
-            public static void CloseConnection(ILogger logger, string connectionId)
-            {
-            }
-
-            public static void ServiceConnectionClosed(ILogger logger, string serviceConnectionId)
-            {
-            }
-
-            public static void ServiceConnectionConnected(ILogger logger, string serviceConnectionId)
-            {
-            }
-
-            public static void ReadingCancelled(ILogger logger, string serviceConnectionId)
-            {
-            }
-
-            public static void ReceivedMessage(ILogger logger, long bytes, string serviceConnectionId)
-            {
-            }
-
-            public static void StartingKeepAliveTimer(ILogger logger, TimeSpan keepAliveInterval)
-            {
-            }
-
-            public static void ServiceTimeout(ILogger logger, TimeSpan serviceTimeout)
-            {
-            }
-
-            public static void WriteMessageToApplication(ILogger logger, int count, string connectionId)
-            {
-            }
-
-            public static void SendingHandshakeRequest(ILogger logger)
-            {
-            }
-
-            public static void HandshakeComplete(ILogger logger)
-            {
-            }
-
-            public static void ErrorReceivingHandshakeResponse(ILogger logger, Exception exception)
-            {
-            }
-
-            public static void HandshakeError(ILogger logger, string error)
-            {
-            }
-
-            public static void SentPing(ILogger logger)
-            {
-            }
-
-            public static void FailedSendingPing(ILogger logger, Exception exception)
-            {
-            }
         }
     }
 }

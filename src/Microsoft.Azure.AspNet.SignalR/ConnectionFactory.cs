@@ -111,9 +111,12 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         private static class Log
         {
+            private static readonly Action<ILogger, string, int, int, Exception> _startingConnection =
+                LoggerMessage.Define<string, int, int>(LogLevel.Debug, new EventId(1, "StartingConnection"), "Starting {name} with {hubCount} hubs and {connectionCount} per hub connections...");
+
             public static void StartingConnection(ILogger logger, string name, int connectionCount, int hubCount)
             {
-
+                _startingConnection(logger, name, connectionCount, hubCount, null);
             }
         }
     }

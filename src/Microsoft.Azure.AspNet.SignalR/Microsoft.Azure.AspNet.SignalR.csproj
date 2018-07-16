@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.AspNet.SignalR" Version="2.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Connections.Abstractions" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Connections.Client" Version="1.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="2.1.1" />
     <PackageReference Include="owin" Version="1.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="5.2.4" />
   </ItemGroup>

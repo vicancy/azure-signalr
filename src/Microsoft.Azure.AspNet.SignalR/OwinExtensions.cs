@@ -89,7 +89,7 @@ namespace Owin
             var traceManager = configuration.Resolver.Resolve<ITraceManager>();
             if (traceManager != null)
             {
-                logger = new TraceManagerLoggerFactory(traceManager);
+                logger = new LoggerFactory(new ILoggerProvider[] { new TraceManagerLoggerProvider(traceManager) });
             }
             else
             {

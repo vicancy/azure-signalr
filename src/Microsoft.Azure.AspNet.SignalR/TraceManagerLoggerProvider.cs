@@ -3,31 +3,28 @@
 
 using Microsoft.AspNet.SignalR.Tracing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.TraceSource;
 
 namespace Microsoft.Azure.AspNet.SignalR
 {
-    internal class TraceManagerLoggerFactory : ILoggerFactory
+    internal class TraceManagerLoggerProvider : ILoggerProvider
     {
         private readonly ITraceManager _traceManager;
 
-        public TraceManagerLoggerFactory(ITraceManager traceManager)
+        public TraceManagerLoggerProvider(ITraceManager traceManager)
         {
             _traceManager = traceManager;
         }
 
-        public void AddProvider(ILoggerProvider provider)
-        {
-            throw new System.NotImplementedException();
-        }
-
         public ILogger CreateLogger(string categoryName)
         {
-            throw new System.NotImplementedException();
+            var traceSource = _traceManager[categoryName];
+            return new TraceSourceLogger(traceSource);
         }
 
         public void Dispose()
         {
-            throw new System.NotImplementedException();
         }
     }
 }
+

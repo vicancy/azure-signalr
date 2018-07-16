@@ -7,12 +7,11 @@ using Microsoft.AspNet.SignalR.Hosting;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Json;
-using Microsoft.Azure.AspNet.SignalR;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace Owin
+namespace Microsoft.Azure.AspNet.SignalR
 {
     internal class ServiceHubDispatcher : HubDispatcher
     {
