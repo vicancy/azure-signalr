@@ -311,12 +311,28 @@ namespace Microsoft.Azure.AspNet.SignalR
         {
             if (_connections.TryGetValue(connectionDataMessage.ConnectionId, out var transport))
             {
-                MemoryMarshal.TryGetArray(connectionDataMessage.Payload, out var segment);
-
-                transport.OnReceived(Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count));
+                if (connectionDataMessage.Payload.IsSingleSegment)
+                {
+                    OnReceived(transport, connectionDataMessage.Payload.First);
+                }
+                else
+                {
+                    var position = connectionDataMessage.Payload.Start;
+                    while (connectionDataMessage.Payload.TryGet(ref position, out var memory))
+                    {
+                        OnReceived(transport, memory);
+                    }
+                }
             }
 
             return Task.CompletedTask;
+        }
+
+        private void OnReceived(AzureTransport transport, ReadOnlyMemory<byte> payload)
+        {
+            MemoryMarshal.TryGetArray(payload, out var segment);
+
+            transport.OnReceived(Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count));
         }
 
         private Task ProcessOutgoingMessagesAsync(OpenConnectionMessage message)
