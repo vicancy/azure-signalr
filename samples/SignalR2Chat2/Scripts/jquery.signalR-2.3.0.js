@@ -1245,6 +1245,7 @@
 
                 xhr = transportLogic.ajax(connection, {
                     url: url,
+                    headers: connection.accessToken ? { "Authorization": "Bearer " + connection.accessToken } : {},
                     success: function (result) {
                         var data;
 
