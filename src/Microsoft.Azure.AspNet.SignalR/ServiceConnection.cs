@@ -49,7 +49,7 @@ namespace Microsoft.Azure.AspNet.SignalR
         private readonly JsonSerializer _serializer;
         private readonly HandshakeRequestMessage _handshakeRequest;
         private readonly HubConfiguration _config;
-        private readonly HubDispatcher _dispatcher;
+        private readonly PersistentConnection _dispatcher;
         private readonly IConnectionFactory _connectionFactory;
         private readonly ILogger _logger;
         private readonly ReadOnlyMemory<byte> _cachedPingBytes;
@@ -81,7 +81,7 @@ namespace Microsoft.Azure.AspNet.SignalR
             _handshakeRequest = new HandshakeRequestMessage(_serviceProtocol.Version);
 
             _serializer = _config.Resolver.Resolve<JsonSerializer>();
-            _dispatcher = _config.Resolver.Resolve<HubDispatcher>();
+            _dispatcher = _config.Resolver.Resolve<PersistentConnection>();
             _cachedPingBytes = _serviceProtocol.GetMessageBytes(PingMessage.Instance);
         }
 
@@ -337,7 +337,6 @@ namespace Microsoft.Azure.AspNet.SignalR
 
             var userToken = string.IsNullOrEmpty(user.Identity.Name) ? string.Empty : ":" + user.Identity.Name;
             request.QueryString = new QueryString($"connectionToken={connectionId}{userToken}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
-
             var hostContext = new HostContext(context.Environment);
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
 

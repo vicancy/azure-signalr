@@ -24,23 +24,23 @@ namespace Microsoft.Azure.AspNet.SignalR
         private readonly IReadOnlyList<string> _hubNames;
         private readonly IServiceConnectionManager _serviceConnectionManager;
         private readonly IServiceProtocol _protocol;
-        private readonly ServiceEndpoint _endpoint;
+        private readonly IServiceEndpoint _endpoint;
         private readonly string _name;
         private readonly string _userId;
 
-        public ConnectionFactory(IReadOnlyList<string> hubNames, IServiceProtocol protocol, HubConfiguration hubConfig, ServiceOptions options, ILoggerFactory loggerFactory)
+        public ConnectionFactory(IReadOnlyList<string> hubNames, HubConfiguration hubConfig, ILoggerFactory loggerFactory)
         {
             _config = hubConfig;
-            _options = options;
             _loggerFactory = loggerFactory;
             _hubNames = hubNames;
-            _protocol = protocol;
             _name = $"{nameof(ConnectionFactory)}[{string.Join(",", hubNames)}]";
-
-            _serviceConnectionManager = hubConfig.Resolver.Resolve<IServiceConnectionManager>();
-            _endpoint = hubConfig.Resolver.Resolve<ServiceEndpoint>();
-
             _userId = GenerateServerName();
+
+            _protocol = hubConfig.Resolver.Resolve<IServiceProtocol>();
+            _serviceConnectionManager = hubConfig.Resolver.Resolve<IServiceConnectionManager>();
+            _endpoint = hubConfig.Resolver.Resolve<IServiceEndpoint>();
+            _options = hubConfig.Resolver.Resolve<IConfigure<ServiceOptions>>().Value;
+
             _logger = _loggerFactory.CreateLogger<ConnectionFactory>();
         }
 

@@ -19,7 +19,7 @@ namespace Microsoft.Azure.AspNet.SignalR
         private static readonly ProtocolResolver _protocolResolver = new ProtocolResolver();
 
         private IConfigurationManager _configurationManager;
-        private ServiceEndpoint _endpoint;
+        private IServiceEndpoint _endpoint;
 
         public ServiceHubDispatcher(HubConfiguration configuration) : base(configuration)
         {
@@ -27,7 +27,7 @@ namespace Microsoft.Azure.AspNet.SignalR
 
         public override void Initialize(IDependencyResolver resolver)
         {
-            _endpoint = resolver.Resolve<ServiceEndpoint>();
+            _endpoint = resolver.Resolve<IServiceEndpoint>();
             _configurationManager = resolver.Resolve<IConfigurationManager>();
             base.Initialize(resolver);
         }
@@ -58,9 +58,9 @@ namespace Microsoft.Azure.AspNet.SignalR
                 KeepAliveTimeout = keepAliveTimeout != null ? keepAliveTimeout.Value.TotalSeconds : (double?)null,
                 DisconnectTimeout = _configurationManager.DisconnectTimeout.TotalSeconds,
                 ConnectionTimeout = _configurationManager.ConnectionTimeout.TotalSeconds,
-                ProtocolVersion = _protocolResolver.Resolve(context.Request).ToString(),
                 TransportConnectTimeout = _configurationManager.TransportConnectTimeout.TotalSeconds,
                 LongPollDelay = _configurationManager.LongPollDelay.TotalSeconds,
+                ProtocolVersion = _protocolResolver.Resolve(context.Request).ToString(),
             };
 
             return SendJsonResponse(context, JsonSerializer.Stringify(payload));

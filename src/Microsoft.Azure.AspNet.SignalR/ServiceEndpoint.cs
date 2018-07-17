@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace Microsoft.Azure.AspNet.SignalR
 {
-    internal class ServiceEndpoint
+    internal class ServiceEndpoint : IServiceEndpoint
     {
         private const string EndpointProperty = "endpoint";
         private const string AccessKeyProperty = "accesskey";
@@ -32,15 +32,15 @@ namespace Microsoft.Azure.AspNet.SignalR
         public string Endpoint { get; }
         public string AccessKey { get; }
 
-        public ServiceEndpoint(ServiceOptions options)
+        public ServiceEndpoint(IConfigure<ServiceOptions> options)
         {
-            var connectionString = options.ConnectionString;
+            var connectionString = options.Value.ConnectionString;
             if (connectionString == null)
             {
                 throw new ArgumentException(ConnectionStringNotFound);
             }
 
-            AccessTokenLifetime = options.AccessTokenLifetime;
+            AccessTokenLifetime = options.Value.AccessTokenLifetime;
 
             (Endpoint, AccessKey) = ParseConnectionString(connectionString);
         }
