@@ -11,8 +11,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Owin;
 using Newtonsoft.Json;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipelines;
@@ -22,6 +24,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Microsoft.Azure.AspNet.SignalR
 {
@@ -311,28 +314,15 @@ namespace Microsoft.Azure.AspNet.SignalR
         {
             if (_connections.TryGetValue(connectionDataMessage.ConnectionId, out var transport))
             {
-                if (connectionDataMessage.Payload.IsSingleSegment)
-                {
-                    OnReceived(transport, connectionDataMessage.Payload.First);
-                }
-                else
-                {
-                    var position = connectionDataMessage.Payload.Start;
-                    while (connectionDataMessage.Payload.TryGet(ref position, out var memory))
-                    {
-                        OnReceived(transport, memory);
-                    }
-                }
+                OnReceived(transport, connectionDataMessage.Payload);
             }
 
             return Task.CompletedTask;
         }
 
-        private void OnReceived(AzureTransport transport, ReadOnlyMemory<byte> payload)
+        private void OnReceived(AzureTransport transport, ReadOnlySequence<byte> payload)
         {
-            MemoryMarshal.TryGetArray(payload, out var segment);
-
-            transport.OnReceived(Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count));
+            transport.OnReceived(GetString(payload));
         }
 
         private Task ProcessOutgoingMessagesAsync(OpenConnectionMessage message)
@@ -342,9 +332,10 @@ namespace Microsoft.Azure.AspNet.SignalR
             var response = context.Response;
             var request = context.Request;
 
+            var authenticationType = message.Claims.FirstOrDefault(s => s.Type == "azure.signalr.authenticationtype").Value;
             var user = new ClaimsPrincipal();
             user.AddIdentity(IsAuthenticatedUser(message.Claims)
-                ? new ClaimsIdentity(message.Claims, "Bearer")
+                ? new ClaimsIdentity(message.Claims, string.IsNullOrEmpty(authenticationType) ? "Bearer" : authenticationType)
                 : new ClaimsIdentity());
             request.User = user;
 
@@ -352,9 +343,23 @@ namespace Microsoft.Azure.AspNet.SignalR
             request.Path = new PathString("/");
 
             var userToken = string.IsNullOrEmpty(user.Identity.Name) ? string.Empty : ":" + user.Identity.Name;
-            request.QueryString = new QueryString($"connectionToken={connectionId}{userToken}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
-            var hostContext = new HostContext(context.Environment);
+
+            var queryCollection = string.IsNullOrEmpty(message.QueryString) ? new NameValueCollection() : HttpUtility.ParseQueryString(message.QueryString);
+            queryCollection["connectionToken"] = $"{connectionId}{userToken}";
+
+            //request.QueryString = new QueryString($"connectionToken={connectionId}{userToken}&connectionData=[%7B%22Name%22:%22{HubName}%22%7D]");
+            request.QueryString = new QueryString(queryCollection.ToString());
+
+            if (message.Headers != null)
+            {
+                foreach(var pair in message.Headers)
+                {
+                    request.Headers.Add(pair.Key, pair.Value);
+                }
+            }
+
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
+            var hostContext = new HostContext(context.Environment);
 
             if (_dispatcher.Authorize(hostContext.Request))
             {
@@ -593,6 +598,17 @@ namespace Microsoft.Azure.AspNet.SignalR
             }
 
             return false;
+        }
+
+        private static string GetString(ReadOnlySequence<byte> buffer)
+        {
+            if (buffer.IsSingleSegment)
+            {
+                MemoryMarshal.TryGetArray(buffer.First, out var segment);
+                return Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count);
+            }
+
+            return Encoding.UTF8.GetString(buffer.ToArray());
         }
     }
 }

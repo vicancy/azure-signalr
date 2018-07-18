@@ -8,6 +8,7 @@ using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Json;
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -45,14 +46,20 @@ namespace Microsoft.Azure.AspNet.SignalR
         {
             // Total amount of time without a keep alive before the client should attempt to reconnect in seconds.
             var keepAliveTimeout = _configurationManager.KeepAliveTimeout();
+            var user = new Owin.OwinContext(context.Environment).Authentication.User;
+            var claims = user?.Claims;
+            var authenticationType = user?.Identity?.AuthenticationType;
+            var userId = UserIdProvider.GetUserId(context.Request);
+            var advancedClaims = claims.ToList();
 
-            // https://docs.microsoft.com/en-us/aspnet/core/migration/claimsprincipal-current?view=aspnetcore-2.1
-            var claims = ClaimsPrincipal.Current.Claims;
+            advancedClaims.Add(new Claim("azure.signalr.authenticationtype", authenticationType));
+            advancedClaims.Add(new Claim("azure.signalr.userid", userId));
+
             var payload = new
             {
                 // Redirect to Service
                 Url = _endpoint.GetClientEndpoint(),
-                AccessToken = _endpoint.GenerateClientAccessToken(claims),
+                AccessToken = _endpoint.GenerateClientAccessToken(advancedClaims),
 
                 // Configs
                 KeepAliveTimeout = keepAliveTimeout != null ? keepAliveTimeout.Value.TotalSeconds : (double?)null,
