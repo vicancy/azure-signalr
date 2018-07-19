@@ -325,12 +325,15 @@ namespace Microsoft.Azure.AspNet.SignalR
             transport.OnReceived(GetString(payload));
         }
 
-        private Task ProcessOutgoingMessagesAsync(OpenConnectionMessage message)
+        private async Task ProcessOutgoingMessagesAsync(OpenConnectionMessage message)
         {
             var connectionId = message.ConnectionId;
             var context = new OwinContext();
             var response = context.Response;
             var request = context.Request;
+
+            var responseBuffer = new MemoryStream();
+            response.Body = responseBuffer;
 
             var authenticationType = message.Claims.FirstOrDefault(s => s.Type == "azure.signalr.authenticationtype").Value;
             var user = new ClaimsPrincipal();
@@ -339,7 +342,6 @@ namespace Microsoft.Azure.AspNet.SignalR
                 : new ClaimsIdentity());
             request.User = user;
 
-            response.Body = Stream.Null;
             request.Path = new PathString("/");
 
             var userToken = string.IsNullOrEmpty(user.Identity.Name) ? string.Empty : ":" + user.Identity.Name;
@@ -370,6 +372,8 @@ namespace Microsoft.Azure.AspNet.SignalR
                 if (hostContext.Response.StatusCode != 200)
                 {
                     Debug.Fail("Response statuscode is " + hostContext.Response.StatusCode);
+                    var errorResponse = GetMemoryString(responseBuffer);
+                    await WriteAsync(new CloseConnectionMessage(connectionId, errorResponse));
                 }
 
                 _connections[connectionId] = (AzureTransport)context.Environment[ContextConstants.AzureSignalRTransportKey];
@@ -379,9 +383,17 @@ namespace Microsoft.Azure.AspNet.SignalR
                 // This happens when hub is not found
                 // TODO: what do we do here?
                 Debug.Fail("Unauthorized");
+                await WriteAsync(new CloseConnectionMessage(connectionId));
             }
+        }
 
-            return Task.CompletedTask;
+        private string GetMemoryString(MemoryStream stream)
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+            using (var reader = new StreamReader(stream))
+            {
+                return reader.ReadToEnd();
+            }
         }
 
         private async Task<bool> HandshakeAsync()
