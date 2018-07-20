@@ -3,7 +3,7 @@
 
 using System;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     /// <summary>
     /// Configurable options when using Azure SignalR Service.

@@ -1,4 +1,4 @@
-﻿namespace Microsoft.Azure.AspNet.SignalR
+﻿namespace Microsoft.Azure.SignalR.AspNet
 {
     internal static class ContextConstants
     {

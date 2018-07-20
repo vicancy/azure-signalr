@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal interface IConnectionFactory
     {

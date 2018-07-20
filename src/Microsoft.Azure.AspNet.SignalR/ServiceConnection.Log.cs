@@ -4,7 +4,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal partial class ServiceConnection
     {

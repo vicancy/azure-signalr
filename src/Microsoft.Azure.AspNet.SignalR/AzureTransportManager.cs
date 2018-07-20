@@ -4,7 +4,7 @@
 using Microsoft.AspNet.SignalR.Hosting;
 using Microsoft.AspNet.SignalR.Transports;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal class AzureTransportManager : ITransportManager
     {

@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal interface IConfigure<T> where T: class
     {

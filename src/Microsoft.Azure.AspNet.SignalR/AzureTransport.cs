@@ -3,7 +3,7 @@ using Microsoft.AspNet.SignalR.Transports;
 using System;
 using System.Threading.Tasks;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal class AzureTransport : ITransport
     {

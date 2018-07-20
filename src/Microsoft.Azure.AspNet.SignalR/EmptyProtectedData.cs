@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNet.SignalR.Infrastructure;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal class EmptyProtectedData : IProtectedData
     {

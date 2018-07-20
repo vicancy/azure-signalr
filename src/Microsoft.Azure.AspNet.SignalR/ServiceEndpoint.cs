@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal class ServiceEndpoint : IServiceEndpoint
     {

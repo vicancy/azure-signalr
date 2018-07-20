@@ -5,7 +5,7 @@ using Microsoft.AspNet.SignalR.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.TraceSource;
 
-namespace Microsoft.Azure.AspNet.SignalR
+namespace Microsoft.Azure.SignalR.AspNet
 {
     internal class TraceManagerLoggerProvider : ILoggerProvider
     {
