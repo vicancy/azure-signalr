@@ -363,10 +363,13 @@ namespace Microsoft.Azure.SignalR.AspNet
             context.Environment[ContextConstants.AzureServiceConnectionKey] = this;
             var hostContext = new HostContext(context.Environment);
 
-            if (_dispatcher.Authorize(hostContext.Request))
+            var dispatcher = new HubDispatcher(_config);
+            dispatcher.Initialize(_config.Resolver);
+
+            if (dispatcher.Authorize(hostContext.Request))
             {
                 // ProcessRequest checks if the connectionToken matches "{connectionid}:{userName}" format with context.User
-                _ = _dispatcher.ProcessRequest(hostContext);
+                _ = dispatcher.ProcessRequest(hostContext);
 
                 // TODO: check for errors written to the response
                 if (hostContext.Response.StatusCode != 200)

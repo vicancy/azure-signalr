@@ -7,6 +7,7 @@ using Microsoft.AspNet.SignalR.Hosting;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Json;
+using Microsoft.Owin;
 using System;
 using System.Linq;
 using System.Security.Claims;
@@ -14,16 +15,44 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Azure.SignalR.AspNet
 {
+    internal class ServiceHubMiddleware : OwinMiddleware
+    {
+        private readonly HubConfiguration _configuration;
+        private readonly string _id;
+        public ServiceHubMiddleware(OwinMiddleware next, string id, HubConfiguration configuration)
+            : base(next)
+        {
+            _id = id;
+            _configuration = configuration;
+        }
+
+        public override Task Invoke(IOwinContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException("context");
+            }
+
+            var connection = new ServiceHubDispatcher(_id, _configuration);
+
+            connection.Initialize(_configuration.Resolver);
+
+            return connection.ProcessRequest(context.Environment);
+        }
+    }
+
     internal class ServiceHubDispatcher : HubDispatcher
     {
         private const string WebSocketsTransportName = "webSockets";
         private static readonly ProtocolResolver _protocolResolver = new ProtocolResolver();
 
+        private readonly string _id;
         private IConfigurationManager _configurationManager;
         private IServiceEndpoint _endpoint;
 
-        public ServiceHubDispatcher(HubConfiguration configuration) : base(configuration)
+        public ServiceHubDispatcher(string id, HubConfiguration configuration) : base(configuration)
         {
+            _id = id;
         }
 
         public override void Initialize(IDependencyResolver resolver)
@@ -54,6 +83,7 @@ namespace Microsoft.Azure.SignalR.AspNet
 
             advancedClaims.Add(new Claim("azure.signalr.authenticationtype", authenticationType));
             advancedClaims.Add(new Claim("azure.signalr.userid", userId));
+            advancedClaims.Add(new Claim("arsr.s.svrn", _id));
 
             var payload = new
             {
