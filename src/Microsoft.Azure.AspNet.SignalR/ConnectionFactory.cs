@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.Azure.SignalR.Protocol;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Microsoft.Azure.SignalR.AspNet
 {
@@ -21,20 +22,20 @@ namespace Microsoft.Azure.SignalR.AspNet
         private readonly HubConfiguration _config;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<ConnectionFactory> _logger;
-        private readonly IReadOnlyList<string> _hubNames;
         private readonly IServiceConnectionManager _serviceConnectionManager;
         private readonly IServiceProtocol _protocol;
         private readonly IServiceEndpoint _endpoint;
+        private readonly IReadOnlyList<string> _hubNames;
         private readonly string _name;
         private readonly string _userId;
+        private readonly string _id;
 
-        public ConnectionFactory(IReadOnlyList<string> hubNames, HubConfiguration hubConfig, ILoggerFactory loggerFactory)
+        public ConnectionFactory(string id, IReadOnlyList<string> hubNames, HubConfiguration hubConfig, ILoggerFactory loggerFactory)
         {
             _config = hubConfig;
             _loggerFactory = loggerFactory;
-            _hubNames = hubNames;
-            _name = $"{nameof(ConnectionFactory)}[{string.Join(",", hubNames)}]";
             _userId = GenerateServerName();
+            _hubNames = hubNames;
 
             _protocol = hubConfig.Resolver.Resolve<IServiceProtocol>();
             _serviceConnectionManager = hubConfig.Resolver.Resolve<IServiceConnectionManager>();
@@ -42,6 +43,10 @@ namespace Microsoft.Azure.SignalR.AspNet
             _options = hubConfig.Resolver.Resolve<IConfigure<ServiceOptions>>().Value;
 
             _logger = _loggerFactory.CreateLogger<ConnectionFactory>();
+
+            // Need an id similar to HubName that client knows (through jwt token) but shared across hubs
+            _id = id;
+            _name = $"{nameof(ConnectionFactory)}[{_id}]";
         }
 
         public async Task<ConnectionContext> ConnectAsync(TransferFormat transferFormat, string connectionId, string hubName, CancellationToken cancellationToken = default)
@@ -73,10 +78,17 @@ namespace Microsoft.Azure.SignalR.AspNet
 
         public Task StartAsync()
         {
-            foreach(var hub in _hubNames)
+            // Add a connection specially for the whole App, all the messages except broadcast goes into this connection
+            _serviceConnectionManager.AppConnection =
+                    new ServiceConnectionContainer(
+                        Enumerable.Repeat(
+                            new ServiceConnection(_id, Guid.NewGuid().ToString(), _protocol, _config, this, _logger), _options.ConnectionCount)
+                            .ToList());
+
+            foreach (var hub in _hubNames)
             {
                 // Simply create a couple of connections which connect to Azure SignalR
-                _serviceConnectionManager.AddConnection(hub, 
+                _serviceConnectionManager.AddConnection(hub,
                     new ServiceConnectionContainer(
                         Enumerable.Repeat(
                             new ServiceConnection(hub, Guid.NewGuid().ToString(), _protocol, _config, this, _logger), _options.ConnectionCount)
@@ -107,6 +119,11 @@ namespace Microsoft.Azure.SignalR.AspNet
             // Use the machine name for convenient diagnostics, but add a guid to make it unique.
             // Example: MyServerName_02db60e5fab243b890a847fa5c4dcb29
             return $"{Environment.MachineName}_{Guid.NewGuid():N}";
+        }
+
+        private sealed class ConnectionDataHub
+        {
+            public string Name { get; set; }
         }
 
         private static class Log

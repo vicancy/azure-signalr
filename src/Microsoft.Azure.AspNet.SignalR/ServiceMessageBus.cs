@@ -49,17 +49,18 @@ namespace Microsoft.Azure.SignalR.AspNet
             }
 
             // p2p case
-            if (TryGetName(message.Key, PrefixHelper.ConnectionIdPrefix, out var connectonId))
-            {
-                return _serviceConnectionManager.WriteAsync(new ConnectionDataMessage(connectonId, segment));
-            }
-
-            // echo case
             if (TryGetName(message.Key, PrefixHelper.HubConnectionIdPrefix, out var connectionWithHubPrefix))
             {
                 // naming: hc-{HubName}.{ConnectionId}
-                var connections = _serviceConnectionManager.GetPossibleConnections(connectionWithHubPrefix);
-                return Task.WhenAll(connections.Select(pair => pair.Item1.WriteAsync(new ConnectionDataMessage(pair.Item2, segment))));
+                // ConnectionId does not contain .
+                var index = message.Key.LastIndexOf('.');
+                if (index < 0 || index == message.Key.Length - 1)
+                {
+                    throw new ArgumentException($"Key must contain '.' in between but it is not: {message.Key}");
+                }
+
+                var connectionId = message.Key.Substring(index + 1);
+                return _serviceConnectionManager.WriteAsync(new ConnectionDataMessage(connectionId, segment));
             }
 
             // group broadcast case
@@ -68,9 +69,10 @@ namespace Microsoft.Azure.SignalR.AspNet
                 var connections = _serviceConnectionManager.GetPossibleConnections(groupWithHubPrefix);
 
                 // naming: hg-{HubName}.{GroupName}, it as a whole is the group name per the JoinGroup implementation
-                return Task.WhenAll(
-                    connections.Select(pair => pair.Item1.WriteAsync(
-                    new GroupBroadcastDataMessage(message.Key, excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment)))));
+                // go through the appName connection
+                return _serviceConnectionManager.WriteAsync(
+                    new GroupBroadcastDataMessage(message.Key, excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment))
+                    );
             }
 
             // user case

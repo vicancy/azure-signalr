@@ -15,6 +15,8 @@ namespace Microsoft.Azure.SignalR.AspNet
         private readonly ConcurrentDictionary<string, IServiceConnection> _serviceConnections = new ConcurrentDictionary<string, IServiceConnection>();
         private readonly HashSet<string> _hubNameWithDots = new HashSet<string>();
 
+        public IServiceConnection AppConnection { get; set; }
+
         public void AddConnection(string hubName, IServiceConnection connection)
         {
             _serviceConnections.TryAdd(hubName, connection);
@@ -38,6 +40,7 @@ namespace Microsoft.Azure.SignalR.AspNet
             }
             return connection;
         }
+
         /// <summary>
         /// The fully qualified name is as {HubName}.{Name}
         /// </summary>
@@ -64,13 +67,29 @@ namespace Microsoft.Azure.SignalR.AspNet
             var name = nameWithHubPrefix.Substring(index + 1);
             yield return (WithHub(hubName), name);
         }
+
         public Task StartAsync()
         {
-            return Task.WhenAll(_serviceConnections.Values.Select(s => s.StartAsync()));
+            return Task.WhenAll(GetConnections().Select(s => s.StartAsync()));
         }
+
         public Task WriteAsync(ServiceMessage serviceMessage)
         {
-            return Task.WhenAll(_serviceConnections.Values.Select(s => s.WriteAsync(serviceMessage)));
+            return AppConnection?.WriteAsync(serviceMessage);
+        }
+
+        private IEnumerable<IServiceConnection> GetConnections()
+        {
+            var appConnection = AppConnection;
+            if (appConnection != null)
+            {
+                yield return appConnection;
+            }
+
+            foreach (var conn in _serviceConnections)
+            {
+                yield return conn.Value;
+            }
         }
     }
 }

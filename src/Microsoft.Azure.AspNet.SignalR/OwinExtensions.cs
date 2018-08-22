@@ -72,6 +72,7 @@ namespace Owin
             var hubManager = configuration.Resolver.Resolve<IHubManager>();
             var hubs = hubManager.GetHubs().Select(s => s.Name).ToList();
 
+            // Add instanceName to connection
             // If we don't get a valid instance name then generate a random one
             var instanceName = (builder.Properties.GetAppInstanceName() ?? Guid.NewGuid().ToString("N")).ToLower();
 
