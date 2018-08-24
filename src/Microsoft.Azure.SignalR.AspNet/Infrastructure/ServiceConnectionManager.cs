@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,31 +17,20 @@ namespace Microsoft.Azure.SignalR.AspNet
     {
         private const char DotChar = '.';
 
-        private readonly ConcurrentDictionary<string, IServiceConnection> _serviceConnections = new ConcurrentDictionary<string, IServiceConnection>();
+        private IReadOnlyDictionary<string, IServiceConnectionContainer> _serviceConnections = null;
         private readonly HashSet<string> _hubNameWithDots = new HashSet<string>();
 
-        public void AddConnection(string hubName, IServiceConnection connection)
-        {
-            _serviceConnections.TryAdd(hubName, connection);
-
-            // It is possible that the hub contains dot character, while the fully qualified name is formed as {HubName}.{Name} (Name can be connectionId or userId or groupId)
-            // So keep a copy of the hub names containing dots and return all the possible combinations when the fully qualified name is provided
-            if (hubName.IndexOf(DotChar) > -1)
-            {
-                lock (_hubNameWithDots)
-                {
-                    _hubNameWithDots.Add(hubName);
-                }
-            }
-        }
-        private IReadOnlyDictionary<string, IServiceConnectionContainer> _serviceConnections = null;
         private readonly object _lock = new object();
 
         private readonly IReadOnlyList<string> _hubs;
+        private readonly string _appName;
 
-        public ServiceConnectionManager(IReadOnlyList<string> hubs)
+        private IServiceConnectionContainer _appConnection;
+
+        public ServiceConnectionManager(string appName, IReadOnlyList<string> hubs)
         {
             _hubs = hubs;
+            _appName = appName;
         }
 
         public void Initialize(Func<string, IServiceConnection> connectionGenerator, int connectionCount)
@@ -69,12 +59,27 @@ namespace Microsoft.Azure.SignalR.AspNet
                 }
 
                 var connections = new Dictionary<string, IServiceConnectionContainer>();
+
+                _appConnection = new ServiceConnectionContainer(
+                        () => connectionGenerator(_appName),
+                        connectionCount);
+
                 foreach (var hub in _hubs)
                 {
                     var connection = new ServiceConnectionContainer(
                             () => connectionGenerator(hub),
                             connectionCount);
                     connections.Add(hub, connection);
+
+                    // It is possible that the hub contains dot character, while the fully qualified name is formed as {HubName}.{Name} (Name can be connectionId or userId or groupId)
+                    // So keep a copy of the hub names containing dots and return all the possible combinations when the fully qualified name is provided
+                    if (hub.IndexOf(DotChar) > -1)
+                    {
+                        lock (_hubNameWithDots)
+                        {
+                            _hubNameWithDots.Add(hub);
+                        }
+                    }
                 }
 
                 _serviceConnections = connections;
@@ -93,7 +98,7 @@ namespace Microsoft.Azure.SignalR.AspNet
 
         public IServiceConnectionContainer WithHub(string hubName)
         {
-            if (!_serviceConnections.TryGetValue(hubName, out var connection))
+            if (_serviceConnections == null ||!_serviceConnections.TryGetValue(hubName, out var connection))
             {
                 throw new KeyNotFoundException($"Service connection with Hub {hubName} does not exist");
             }
@@ -101,23 +106,32 @@ namespace Microsoft.Azure.SignalR.AspNet
             return connection;
         }
 
-        public Task WriteAsync(string partitionKey, ServiceMessage serviceMessage)
-        {
-            return Task.WhenAll(GetConnections().Select(s => s.WriteAsync(partitionKey, serviceMessage)));
-        }
-
         public Task WriteAsync(ServiceMessage serviceMessage)
         {
-            return Task.WhenAll(GetConnections().Select(s => s.WriteAsync(serviceMessage)));
+            if (_appConnection == null)
+            {
+                throw new InvalidOperationException("App connection is not yet initialized.");
+            }
+
+            return _appConnection.WriteAsync(serviceMessage);
         }
 
+        public Task WriteAsync(string partitionKey, ServiceMessage serviceMessage)
+        {
+            if (_appConnection == null)
+            {
+                throw new InvalidOperationException("App connection is not yet initialized.");
+            }
+
+            return _appConnection.WriteAsync(partitionKey, serviceMessage);
+        }
 
         /// <summary>
         /// The fully qualified name is as {HubName}.{Name}
         /// </summary>
         /// <param name="nameWithHubPrefix"></param>
         /// <returns>The connection and the name without hub prefix</returns>
-        public IEnumerable<(IServiceConnection, string)> GetPossibleConnections(string nameWithHubPrefix)
+        public IEnumerable<(IServiceConnectionContainer, string)> GetPossibleConnections(string nameWithHubPrefix)
         {
             var index = nameWithHubPrefix.IndexOf(DotChar);
             if (index == -1)
@@ -143,9 +157,17 @@ namespace Microsoft.Azure.SignalR.AspNet
 
         private IEnumerable<IServiceConnectionContainer> GetConnections()
         {
-            foreach(var pair in _serviceConnections)
+            if (_appConnection != null)
             {
-                yield return pair.Value;
+                yield return _appConnection;
+            }
+
+            if (_serviceConnections != null)
+            {
+                foreach (var conn in _serviceConnections)
+                {
+                    yield return conn.Value;
+                }
             }
         }
     }

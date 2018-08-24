@@ -49,22 +49,32 @@ namespace Microsoft.Azure.SignalR.AspNet
             }
 
             // echo case
-            if (TryGetName(message.Key, PrefixHelper.HubConnectionIdPrefix, out var connectionWithHubPrefix))
+            if (TryGetName(message.Key, PrefixHelper.HubConnectionIdPrefix, out _))
             {
                 // naming: hc-{HubName}.{ConnectionId}
-                var connections = _serviceConnectionManager.GetPossibleConnections(connectionWithHubPrefix);
-                return Task.WhenAll(connections.Select(pair => pair.Item1.WriteAsync(new ConnectionDataMessage(pair.Item2, segment))));
+                // ConnectionId can NEVER contain .
+                var index = message.Key.LastIndexOf('.');
+                if (index < 0 || index == message.Key.Length - 1)
+                {
+                    throw new ArgumentException($"Key must contain '.' in between but it is not: {message.Key}");
+                }
+
+                var connectionId = message.Key.Substring(index + 1);
+
+                // Go through the app connection
+                return _serviceConnectionManager.WriteAsync(new ConnectionDataMessage(connectionId, segment));
             }
 
             // group broadcast case
-            if (TryGetName(message.Key, PrefixHelper.HubGroupPrefix, out var groupWithHubPrefix))
+            if (TryGetName(message.Key, PrefixHelper.HubGroupPrefix, out _))
             {
-                var connections = _serviceConnectionManager.GetPossibleConnections(groupWithHubPrefix);
-
                 // naming: hg-{HubName}.{GroupName}, it as a whole is the group name per the JoinGroup implementation
-                return Task.WhenAll(
-                    connections.Select(pair => pair.Item1.WriteAsync(
-                    new GroupBroadcastDataMessage(message.Key, excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment)))));
+                // go through the app connection
+                // use groupName as the partitionkey so that commands towards the same group always goes into the same service connection
+                var groupName = message.Key;
+                return _serviceConnectionManager.WriteAsync(
+                    groupName,
+                    new GroupBroadcastDataMessage(groupName, excludedList: GetExcludedIds(message.Filter), payloads: GetPayloads(segment)));
             }
 
             // user case
@@ -89,19 +99,25 @@ namespace Microsoft.Azure.SignalR.AspNet
                 case CommandType.AddToGroup:
                     {
                         // name is hg-{HubName}.{GroupName}, consider the whole as the actual group name
-                        // With multiple hubs, every hub connection receives the JoinGroupMessage
-                        var name = command.Value;
+                        // this message always goes through the appName-connection
+                        var groupName = command.Value;
                         var connectionId = GetName(message.Key, PrefixHelper.ConnectionIdPrefix);
 
-                        await _serviceConnectionManager.WriteAsync(new JoinGroupMessage(connectionId, name));
+                        // go through the app connection
+                        // use groupName as the partitionkey so that commands towards the same group always goes into the same service connection
+                        await _serviceConnectionManager.WriteAsync(groupName, new JoinGroupMessage(connectionId, groupName));
                         _ackHandler.TriggerAck(message.CommandId);
                     }
                     break;
                 case CommandType.RemoveFromGroup:
                     {
-                        var name = command.Value;
+                        // this message always goes through the appName-connection
+                        var groupName = command.Value;
                         var connectionId = GetName(message.Key, PrefixHelper.ConnectionIdPrefix);
-                        await _serviceConnectionManager.WriteAsync(new LeaveGroupMessage(connectionId, name));
+
+                        // go through the app connection
+                        // use groupName as the partitionkey so that commands towards the same group always goes into the same service connection
+                        await _serviceConnectionManager.WriteAsync(groupName, new LeaveGroupMessage(connectionId, groupName));
                     }
                     break;
                 case CommandType.Initializing:

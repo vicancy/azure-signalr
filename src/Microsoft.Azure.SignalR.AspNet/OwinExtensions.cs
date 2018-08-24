@@ -18,58 +18,59 @@ namespace Owin
 {
     public static partial class OwinExtensions
     {
-        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder)
+        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string appName)
         {
-            return builder.MapAzureSignalR(new HubConfiguration());
+            return builder.MapAzureSignalR(appName, new HubConfiguration());
         }
 
-        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, HubConfiguration configuration)
+        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration)
         {
-            return builder.MapAzureSignalR("/signalr", configuration);
+            return builder.MapAzureSignalR("/signalr", appName, configuration);
         }
 
-        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string path, HubConfiguration configuration)
+        public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string path, string appName, HubConfiguration configuration)
         {
-            return builder.Map(path, subApp => subApp.RunAzureSignalR(configuration));
+            return builder.Map(path, subApp => subApp.RunAzureSignalR(appName, configuration));
         }
 
-        public static void RunAzureSignalR(this IAppBuilder builder)
+        public static void RunAzureSignalR(this IAppBuilder builder, string appName)
         {
-            builder.RunAzureSignalR(new HubConfiguration());
+            builder.RunAzureSignalR(appName, new HubConfiguration());
         }
 
-        public static void RunAzureSignalR(this IAppBuilder builder, string connectionString)
+        public static void RunAzureSignalR(this IAppBuilder builder, string appName, string connectionString)
         {
-            RunAzureSignalR(builder, new HubConfiguration(), connectionString);
+            RunAzureSignalR(builder, appName, connectionString, new HubConfiguration());
         }
 
-        public static void RunAzureSignalR(this IAppBuilder builder, HubConfiguration configuration)
+        public static void RunAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration)
         {
-            RunAzureSignalR(builder, configuration, ConfigurationManager.ConnectionStrings[ServiceOptions.ConnectionStringDefaultKey]?.ConnectionString);
+            RunAzureSignalR(builder, appName, ConfigurationManager.ConnectionStrings[ServiceOptions.ConnectionStringDefaultKey]?.ConnectionString, configuration);
         }
 
-        public static void RunAzureSignalR(this IAppBuilder builder, HubConfiguration configuration, string connectionString)
+        public static void RunAzureSignalR(this IAppBuilder builder, string appName, string connectionString, HubConfiguration configuration)
         {
-            RunAzureSignalR(builder, configuration, s => s.ConnectionString = connectionString);
+            RunAzureSignalR(builder, appName, configuration, s => s.ConnectionString = connectionString);
         }
 
-        public static void RunAzureSignalR(this IAppBuilder builder, HubConfiguration configuration, Action<ServiceOptions> optionsConfigure)
+        public static void RunAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration, Action<ServiceOptions> optionsConfigure)
         {
             var serviceOptions = new ServiceOptions();
             optionsConfigure?.Invoke(serviceOptions);
-            RunAzureSignalRCore(builder, configuration, serviceOptions);
+            RunAzureSignalRCore(builder, appName, configuration, serviceOptions);
         }
 
-        private static void RunAzureSignalRCore(IAppBuilder builder, HubConfiguration configuration, ServiceOptions options)
+        private static void RunAzureSignalRCore(IAppBuilder builder, string appName, HubConfiguration configuration, ServiceOptions options)
         {
             var hubs = GetAvailableHubNames(configuration);
 
+            // TODO: Update to use Middleware when SignalR SDK is ready
             // Replace default HubDispatcher with a custom one, which has its own negotiation logic
             // https://github.com/SignalR/SignalR/blob/dev/src/Microsoft.AspNet.SignalR.Core/Hosting/PersistentConnectionFactory.cs#L42
-            configuration.Resolver.Register(typeof(PersistentConnection), () => new ServiceHubDispatcher(configuration));
+            configuration.Resolver.Register(typeof(PersistentConnection), () => new ServiceHubDispatcher(configuration, appName));
             builder.RunSignalR(typeof(PersistentConnection), configuration);
 
-            RegisterServiceObjects(configuration, options, hubs);
+            RegisterServiceObjects(configuration, options, appName, hubs);
 
             if (hubs?.Count > 0)
             {
@@ -82,7 +83,7 @@ namespace Owin
             }
         }
 
-        private static void RegisterServiceObjects(HubConfiguration configuration, ServiceOptions options, IReadOnlyList<string> hubs)
+        private static void RegisterServiceObjects(HubConfiguration configuration, ServiceOptions options, string appName, IReadOnlyList<string> hubs)
         {
             // TODO: Using IOptions looks wierd, thinking of a way removing it
             // share the same object all through
@@ -91,7 +92,7 @@ namespace Owin
             var serviceProtocol = new ServiceProtocol();
             var endpoint = new ServiceEndpointProvider(serviceOptions.Value);
             var provider = new EmptyProtectedData();
-            var scm = new ServiceConnectionManager(hubs);
+            var scm = new ServiceConnectionManager(appName, hubs);
 
             // For safety, ALWAYS register abstract classes or interfaces
             // Some third-party DI frameworks such as Ninject, implicit self-binding concrete types:

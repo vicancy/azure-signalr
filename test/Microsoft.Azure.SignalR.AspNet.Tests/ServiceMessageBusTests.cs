@@ -15,10 +15,12 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
 {
     public class ServiceMessageBusTests
     {
+        private const string AppName = nameof(ServiceMessageBusTests);
+
         [Fact]
         public async Task PublishInvalidMessageThrows()
         {
-            var dr = GetDefaultResolver(out _);
+            var dr = GetDefaultResolver(new string[] { }, out _);
             using (var bus = new ServiceMessageBus(dr))
             {
                 await Assert.ThrowsAsync<NotSupportedException>(() => bus.Publish("test", "key", "1"));
@@ -28,7 +30,7 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
         [Fact]
         public async Task PublishMessageToNotExistHubThrows()
         {
-            var dr = GetDefaultResolver(out _);
+            var dr = GetDefaultResolver(new string[] { }, out _);
             using (var bus = new ServiceMessageBus(dr))
             {
                 await Assert.ThrowsAsync<KeyNotFoundException>(() => bus.Publish("test", "h-key", "1"));
@@ -53,9 +55,9 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
         [MemberData(nameof(BroadcastTestMessages))]
         public async Task PublishBroadcastMessagesTest(string messageKey, string messageValue, string[] availableHubs, string[] expectedHubs)
         {
-            var dr = GetDefaultResolver(out var scm);
+            var dr = GetDefaultResolver(availableHubs, out var scm);
 
-            PrepareConnection(scm, availableHubs, out var result);
+            PrepareConnection(scm, out var result);
 
             using (var bus = new ServiceMessageBus(dr))
             {
@@ -75,15 +77,15 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
 
         public static IEnumerable<object[]> ConnectionDataTestMessages => new object[][]
             {
-                // hub connection "hub1" gets this connection message
+                // app connection gets this connection message
                 new object[]
                 {
-                    "hc-hub1.c1", "hello", new string[] { "hc", "hc-", "hub1", "hub1.c", "hub1.c1" }, new string[] { "hub1" }, new string[] { "c1" }
+                    "hc-hub1.c1", "hello", new string[] { "hc", "hc-", "hub1", "hub1.c", "hub1.c1" }, new string[] { AppName }, new string[] { "c1" }
                 },
-                // hub connection "hub1" & "hub1.bi" gets this connection message
+                // app connection gets this connection message
                 new object[]
                 {
-                    "hc-hub1.bi.conn1", "hello", new string[] { "hc", "hc-hub1", "hub1", "hub1.bi", "hub1.bi.conn" }, new string[] { "hub1", "hub1.bi" }, new string[] { "bi.conn1", "conn1" }
+                    "hc-hub1.bi.conn1", "hello", new string[] { "hc", "hc-hub1", "hub1", "hub1.bi", "hub1.bi.conn" }, new string[] { AppName }, new string[] { "conn1" }
                 }
             };
 
@@ -91,9 +93,9 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
         [MemberData(nameof(ConnectionDataTestMessages))]
         public async Task PublishConnectionDataMessagesTest(string messageKey, string messageValue, string[] availableHubs, string[] expectedHubs, string[] expectedConnectionIds)
         {
-            var dr = GetDefaultResolver(out var scm);
+            var dr = GetDefaultResolver(availableHubs, out var scm);
 
-            PrepareConnection(scm, availableHubs, out var result);
+            PrepareConnection(scm, out var result);
 
             using (var bus = new ServiceMessageBus(dr))
             {
@@ -116,16 +118,16 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
 
         public static IEnumerable<object[]> GroupBroadcastTestMessages => new object[][]
             {
-                // hub connection "h1" gets this connection message
+                // app connection gets this connection message
                 new object[]
                 {
                     // For groups, group name as a whole is considered as the group name
-                    "hg-h1.group1", "hello", new string[] { "hg-h1", "hg", "h1" }, new string[] { "h1" }, new string[] { "hg-h1.group1" }
+                    "hg-h1.group1", "hello", new string[] { "hg-h1", "hg", "h1" }, new string[] { AppName }, new string[] { "hg-h1.group1" }
                 },
-                // hub connection "h1" & "h1.a1" gets this connection message, with group name not changed
+                // app connection gets this connection message
                 new object[]
                 {
-                    "hg-h1.a1.group1", "hello", new string[] { "hg-h1", "hg", "h1", "h1.a1" }, new string[] { "h1", "h1.a1" }, new string[] { "hg-h1.a1.group1", "hg-h1.a1.group1" }
+                    "hg-h1.a1.group1", "hello", new string[] { "hg-h1", "hg", "h1", "h1.a1" }, new string[] { AppName }, new string[] { "hg-h1.a1.group1" }
                 }
             };
 
@@ -133,9 +135,9 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
         [MemberData(nameof(GroupBroadcastTestMessages))]
         public async Task PublishGroupBroadcastDataMessagesTest(string messageKey, string messageValue, string[] availableHubs, string[] expectedHubs, string[] expectedGroups)
         {
-            var dr = GetDefaultResolver(out var scm);
+            var dr = GetDefaultResolver(availableHubs, out var scm);
 
-            PrepareConnection(scm, availableHubs, out var result);
+            PrepareConnection(scm, out var result);
 
             using (var bus = new ServiceMessageBus(dr))
             {
@@ -173,9 +175,9 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
         [MemberData(nameof(UserDataTestMessages))]
         public async Task PublishUserDataMessagesTest(string messageKey, string messageValue, string[] availableHubs, string[] expectedHubs, string[] expectedUsers)
         {
-            var dr = GetDefaultResolver(out var scm);
+            var dr = GetDefaultResolver(availableHubs, out var scm);
 
-            PrepareConnection(scm, availableHubs, out var result);
+            PrepareConnection(scm, out var result);
 
             using (var bus = new ServiceMessageBus(dr))
             {
@@ -196,40 +198,37 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
             }
         }
 
-        private static void PrepareConnection(IServiceConnectionManager scm, IEnumerable<string> hubs, out SortedList<string, ServiceMessage> output)
+        private static void PrepareConnection(IServiceConnectionManager scm, out SortedList<string, ServiceMessage> output)
         {
             var result = new SortedList<string, ServiceMessage>();
-            foreach (var hub in hubs)
-            {
-                scm.AddConnection(hub, new TestServiceConnection(hub,
+            scm.Initialize(hub => new TestServiceConnection(hub,
                     m =>
                     {
                         lock (result)
                         {
                             result.Add(hub, m.Item1);
                         }
-                    }));
-            }
+                    }), 5);
             output = result;
         }
 
-        private static IDependencyResolver GetDefaultResolver(out IServiceConnectionManager scm)
+        private static IDependencyResolver GetDefaultResolver(IReadOnlyList<string> hubs, out IServiceConnectionManager scm)
         {
             var resolver = new DefaultDependencyResolver();
             resolver.Register(typeof(IServiceProtocol), () => new ServiceProtocol());
-            var connectionManager = new ServiceConnectionManager();
+            var connectionManager = new ServiceConnectionManager(AppName, hubs);
             resolver.Register(typeof(IServiceConnectionManager), () => connectionManager);
             scm = connectionManager;
             return resolver;
         }
 
-        private sealed class TestServiceConnection : IServiceConnection
+        private sealed class TestServiceConnection : IServiceConnectionContainer
         {
-            private readonly Action<(ServiceMessage, IServiceConnection)> _validator;
+            private readonly Action<(ServiceMessage, IServiceConnectionContainer)> _validator;
 
             public string HubName { get; }
 
-            public TestServiceConnection(string name, Action<(ServiceMessage, IServiceConnection)> validator)
+            public TestServiceConnection(string name, Action<(ServiceMessage, IServiceConnectionContainer)> validator)
             {
                 _validator = validator;
                 HubName = name;
@@ -249,6 +248,11 @@ namespace Microsoft.Azure.SignalR.AspNet.Tests
             public Task StopAsync()
             {
                 return Task.CompletedTask;
+            }
+
+            public Task WriteAsync(string partitionKey, ServiceMessage serviceMessage)
+            {
+                return WriteAsync(serviceMessage);
             }
         }
 
