@@ -70,13 +70,13 @@ namespace Owin
         private static void RunAzureSignalRCore(IAppBuilder builder, HubConfiguration configuration)
         {
             var hubManager = configuration.Resolver.Resolve<IHubManager>();
-            var hubs = hubManager.GetHubs().Select(s => s.Name).ToList();
+            var hubs = hubManager.GetHubs().Select(s => s.Name).OrderBy(s => s).ToList();
 
-            // Add instanceName to connection
-            // If we don't get a valid instance name then generate a random one
-            var instanceName = (builder.Properties.GetAppInstanceName() ?? Guid.NewGuid().ToString("N")).ToLower();
+            // Use joined hub names as an identity for the whole app
+            // So that the same app instance can share appName hub connections
+            var appName = string.Join(",", hubs).ToLower();
 
-            builder.UseSignalRMiddleware<ServiceHubMiddleware>(instanceName, configuration);
+            builder.UseSignalRMiddleware<ServiceHubMiddleware>(appName, configuration);
 
             // share the same object all through
             var serviceOptions = new Configure<ServiceOptions>(new ServiceOptions
@@ -110,7 +110,7 @@ namespace Owin
             }
 
             // Start the server->service connection asynchronously 
-            _ = new ConnectionFactory(instanceName, hubs, configuration, logger).StartAsync();
+            _ = new ConnectionFactory(appName, hubs, configuration, logger).StartAsync();
         }
 
         private static IAppBuilder UseSignalRMiddleware<T>(this IAppBuilder builder, params object[] args)
