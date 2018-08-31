@@ -34,19 +34,19 @@ namespace Microsoft.Azure.SignalR.AspNet
         private readonly string _name;
         private readonly string _userId;
 
-        public ConnectionFactory(IReadOnlyList<string> hubNames, HubConfiguration hubConfig)
+        public ConnectionFactory(IReadOnlyList<string> hubNames, HubConfiguration hubConfig, ILoggerFactory loggerFactory)
         {
             _config = hubConfig;
             _hubNames = hubNames;
             _name = $"{nameof(ConnectionFactory)}[{string.Join(",", hubNames)}]";
             _userId = GenerateServerName();
 
-            _loggerFactory = hubConfig.Resolver.Resolve<ILoggerFactory>() ?? NullLoggerFactory.Instance;
-            _protocol = hubConfig.Resolver.Resolve<IServiceProtocol>();
-            _serviceConnectionManager = hubConfig.Resolver.Resolve<IServiceConnectionManager>();
-            _clientConnectionManager = hubConfig.Resolver.Resolve<IClientConnectionManager>();
-            _endpoint = hubConfig.Resolver.Resolve<IServiceEndpointProvider>();
-            _options = hubConfig.Resolver.Resolve<IOptions<ServiceOptions>>().Value;
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _protocol = hubConfig.Resolver.Resolve<IServiceProtocol>() ?? throw new ArgumentNullException(nameof(_protocol));
+            _serviceConnectionManager = hubConfig.Resolver.Resolve<IServiceConnectionManager>() ?? throw new ArgumentNullException(nameof(_serviceConnectionManager));
+            _clientConnectionManager = hubConfig.Resolver.Resolve<IClientConnectionManager>() ?? throw new ArgumentNullException(nameof(_clientConnectionManager));
+            _endpoint = hubConfig.Resolver.Resolve<IServiceEndpointProvider>() ?? throw new ArgumentNullException(nameof(_endpoint));
+            _options = hubConfig.Resolver.Resolve<IOptions<ServiceOptions>>().Value ?? throw new ArgumentNullException(nameof(_options));
 
             _logger = _loggerFactory.CreateLogger<ConnectionFactory>();
         }

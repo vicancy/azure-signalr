@@ -30,7 +30,7 @@ namespace ChatSample.AspNet
                     config.MapHttpAttributeRoutes();
                     map.UseWebApi(config);
                 })
-                .MapSignalR();
+                .MapAzureSignalR(typeof(Startup).FullName);
         }
 
         // For more information on configuring authentication, please visit https://go.microsoft.com/fwlink/?LinkId=301864

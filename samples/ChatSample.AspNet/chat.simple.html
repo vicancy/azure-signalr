@@ -30,6 +30,8 @@
         $(function () {
             // Declare a proxy to reference the hub.
             var connection = $.connection;
+            connection.hub.logging = true;
+            window.console.debug = console.log;
             var chat = connection["Chat.A"];
             // Create a function that the hub can call to broadcast messages.
             chat.client.hello = function (name, message) {

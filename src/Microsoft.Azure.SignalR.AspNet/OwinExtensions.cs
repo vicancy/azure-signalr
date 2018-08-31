@@ -9,50 +9,105 @@ using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Hubs;
 using Microsoft.AspNet.SignalR.Infrastructure;
 using Microsoft.AspNet.SignalR.Messaging;
+using Microsoft.AspNet.SignalR.Tracing;
 using Microsoft.AspNet.SignalR.Transports;
 using Microsoft.Azure.SignalR.AspNet;
 using Microsoft.Azure.SignalR.Protocol;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Owin
 {
     public static partial class OwinExtensions
     {
+        /// <summary>
+        /// Maps Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <returns>The app builder</returns>
         public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string appName)
         {
             return builder.MapAzureSignalR(appName, new HubConfiguration());
         }
 
+        /// <summary>
+        /// Maps Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="configuration">The hub configuration</param>
+        /// <returns>The app builder</returns>
         public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration)
         {
             return builder.MapAzureSignalR("/signalr", appName, configuration);
         }
 
+        /// <summary>
+        /// Maps Azure SignalR hubs to the app builder pipeline at the specified path.
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="path">The path to map signalr hubs</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="configuration">The hub configuration</param>
+        /// <returns>The app builder</returns>
         public static IAppBuilder MapAzureSignalR(this IAppBuilder builder, string path, string appName, HubConfiguration configuration)
         {
             return builder.Map(path, subApp => subApp.RunAzureSignalR(appName, configuration));
         }
 
+        /// <summary>
+        /// Adds Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
         public static void RunAzureSignalR(this IAppBuilder builder, string appName)
         {
             builder.RunAzureSignalR(appName, new HubConfiguration());
         }
 
+        /// <summary>
+        /// Adds Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="connectionString">The connection string of an Azure SignalR Service instance.</param>
         public static void RunAzureSignalR(this IAppBuilder builder, string appName, string connectionString)
         {
             RunAzureSignalR(builder, appName, connectionString, new HubConfiguration());
         }
 
+        /// <summary>
+        /// Adds Azure SignalR hubs to the app builder pipeline at "/signalr" using the connection string specified in web.config 
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="configuration">The hub configuration</param>
         public static void RunAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration)
         {
             RunAzureSignalR(builder, appName, ConfigurationManager.ConnectionStrings[ServiceOptions.ConnectionStringDefaultKey]?.ConnectionString, configuration);
         }
 
+        /// <summary>
+        /// Adds Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="connectionString">The connection string of an Azure SignalR Service instance.</param>
+        /// <param name="configuration">The hub configuration</param>
         public static void RunAzureSignalR(this IAppBuilder builder, string appName, string connectionString, HubConfiguration configuration)
         {
             RunAzureSignalR(builder, appName, configuration, s => s.ConnectionString = connectionString);
         }
 
+        /// <summary>
+        /// Adds Azure SignalR hubs to the app builder pipeline at "/signalr".
+        /// </summary>
+        /// <param name="builder">The app builder</param>
+        /// <param name="appName">The name of your app, it is case-incensitive</param>
+        /// <param name="configuration">The hub configuration</param>
+        /// <param name="optionsConfigure">A callback to configure the <see cref="ServiceOptions"/>.</param>
         public static void RunAzureSignalR(this IAppBuilder builder, string appName, HubConfiguration configuration, Action<ServiceOptions> optionsConfigure)
         {
             var serviceOptions = new ServiceOptions();
@@ -62,6 +117,13 @@ namespace Owin
 
         private static void RunAzureSignalRCore(IAppBuilder builder, string appName, HubConfiguration configuration, ServiceOptions options)
         {
+            if (string.IsNullOrEmpty(appName))
+            {
+                throw new ArgumentNullException(nameof(appName), "Empty app name is not allowed.");
+            }
+
+            appName = appName.ToLower();
+
             var hubs = GetAvailableHubNames(configuration);
 
             // TODO: Update to use Middleware when SignalR SDK is ready
@@ -72,14 +134,26 @@ namespace Owin
 
             RegisterServiceObjects(configuration, options, appName, hubs);
 
+            ILoggerFactory logger;
+            var traceManager = configuration.Resolver.Resolve<ITraceManager>();
+            if (traceManager != null)
+            {
+                logger = new LoggerFactory(new ILoggerProvider[] { new TraceManagerLoggerProvider(traceManager) });
+            }
+            else
+            {
+                logger = new NullLoggerFactory();
+            }
+
             if (hubs?.Count > 0)
             {
-                // Start the server->service connection asynchronously 
-                _ = new ConnectionFactory(hubs, configuration).StartAsync();
+                // Start the server->service connection asynchronously
+                _ = new ConnectionFactory(hubs, configuration, logger).StartAsync();
             }
             else
             {
                 // TODO: log something
+                logger.CreateLogger<IAppBuilder>().Log(LogLevel.Information, "No hub is found.");
             }
         }
 
@@ -93,6 +167,7 @@ namespace Owin
             var endpoint = new ServiceEndpointProvider(serviceOptions.Value);
             var provider = new EmptyProtectedData();
             var scm = new ServiceConnectionManager(appName, hubs);
+            var ccm = new ClientConnectionManager(configuration);
 
             // For safety, ALWAYS register abstract classes or interfaces
             // Some third-party DI frameworks such as Ninject, implicit self-binding concrete types:
@@ -100,12 +175,11 @@ namespace Owin
             configuration.Resolver.Register(typeof(IOptions<ServiceOptions>), () => serviceOptions);
             configuration.Resolver.Register(typeof(IServiceEndpointProvider), () => endpoint);
             configuration.Resolver.Register(typeof(IServiceConnectionManager), () => scm);
+            configuration.Resolver.Register(typeof(IClientConnectionManager), () => ccm);
             configuration.Resolver.Register(typeof(IProtectedData), () => provider);
             configuration.Resolver.Register(typeof(IMessageBus), () => new ServiceMessageBus(configuration.Resolver));
             configuration.Resolver.Register(typeof(ITransportManager), () => new AzureTransportManager(configuration.Resolver));
             configuration.Resolver.Register(typeof(IServiceProtocol), () => serviceProtocol);
-            
-            // TODO: Register LoggerFactory
         }
 
         private static IReadOnlyList<string> GetAvailableHubNames(HubConfiguration configuration)
