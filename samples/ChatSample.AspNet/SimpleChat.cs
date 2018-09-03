@@ -14,6 +14,16 @@ namespace ChatSample.AspNet
     [Authorize]
     public class SimpleChat : Hub
     {
+        public override Task OnReconnected()
+        {
+            return base.OnReconnected();
+        }
+
+        public override Task OnDisconnected(bool stopCalled)
+        {
+            return base.OnDisconnected(stopCalled);
+        }
+
         public override async Task OnConnected()
         {
             await base.OnConnected();

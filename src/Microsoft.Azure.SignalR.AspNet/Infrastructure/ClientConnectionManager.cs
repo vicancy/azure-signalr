@@ -110,7 +110,6 @@ namespace Microsoft.Azure.SignalR.AspNet
 
             foreach (var claim in message.Claims)
             {
-                // TODO: Add prefix "azure.signalr.user." to user claims instead of guessing them?
                 if (claim.Type == Constants.ClaimType.AuthenticationType)
                 {
                     authenticationType = claim.Value;
