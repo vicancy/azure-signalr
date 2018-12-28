@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.SignalR
 {
+
     internal partial class ServiceConnection : ServiceConnectionBase
     {
         private const string ClientConnectionCountInHub = "#clientInHub";
@@ -28,24 +29,29 @@ namespace Microsoft.Azure.SignalR
 
         private readonly ConnectionDelegate _connectionDelegate;
 
+        public ServiceEndpoint Endpoint { get; }
+
         public ServiceConnection(IServiceProtocol serviceProtocol,
                                  IClientConnectionManager clientConnectionManager,
                                  IConnectionFactory connectionFactory, 
                                  ILoggerFactory loggerFactory,
                                  ConnectionDelegate connectionDelegate,
                                  IClientConnectionFactory clientConnectionFactory,
-                                 string connectionId) :
+                                 string connectionId,
+                                 ServiceEndpoint endpoint
+                                 ) :
             base(serviceProtocol, loggerFactory.CreateLogger<ServiceConnection>(), connectionId)
         {
             _clientConnectionManager = clientConnectionManager;
             _connectionFactory = connectionFactory;
             _connectionDelegate = connectionDelegate;
             _clientConnectionFactory = clientConnectionFactory;
+            Endpoint = endpoint;
         }
 
         protected override Task<ConnectionContext> CreateConnection()
         {
-            return _connectionFactory.ConnectAsync(TransferFormat.Binary, _connectionId);
+            return _connectionFactory.ConnectAsync(Endpoint, TransferFormat.Binary, _connectionId);
         }
 
         protected override Task DisposeConnection()

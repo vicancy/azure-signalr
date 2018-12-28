@@ -23,6 +23,25 @@ namespace Microsoft.Azure.SignalR
         private readonly TimeSpan _accessTokenLifetime;
         private readonly IServiceEndpointGenerator _generator;
 
+        public ServiceEndpointProvider(ServiceEndpoint endpoint, TimeSpan expire)
+        {
+            _accessTokenLifetime = expire;
+
+            var version = endpoint.Version;
+            var port = endpoint.Port;
+            _endpoint = endpoint.Endpoint;
+            _accessKey = endpoint.AccessKey;
+
+            if (version == null || version == PreviewVersion)
+            {
+                _generator = new PreviewServiceEndpointGenerator(_endpoint, _accessKey);
+            }
+            else
+            {
+                _generator = new DefaultServiceEndpointGenerator(_endpoint, _accessKey, version, port);
+            }
+        }
+
         public ServiceEndpointProvider(IOptions<ServiceOptions> options)
         {
             var connectionString = options.Value.ConnectionString;

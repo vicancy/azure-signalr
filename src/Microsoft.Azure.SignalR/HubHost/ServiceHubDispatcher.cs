@@ -15,12 +15,19 @@ using Microsoft.Extensions.Options;
 
 namespace Microsoft.Azure.SignalR
 {
+    internal static class ServiceEndpointExtensions
+    {
+        public static IServiceEndpointProvider GetProvider(this ServiceEndpoint endpoint, TimeSpan expire)
+        {
+            return new ServiceEndpointProvider(endpoint, expire);
+        }
+    }
+
     internal class ServiceHubDispatcher<THub> : IConnectionFactory where THub : Hub
     {
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<ServiceHubDispatcher<THub>> _logger;
         private readonly ServiceOptions _options;
-        private readonly IServiceEndpointProvider _serviceEndpointProvider;
         private readonly IServiceConnectionManager<THub> _serviceConnectionManager;
         private readonly IClientConnectionManager _clientConnectionManager;
         private readonly IServiceProtocol _serviceProtocol;
@@ -31,24 +38,29 @@ namespace Microsoft.Azure.SignalR
         // .NET Framework has restriction about reserved string as the header name like "User-Agent"
         private static Dictionary<string, string> CustomHeader = new Dictionary<string, string> { { "Asrs-User-Agent", ProductInfo.GetProductInfo() } };
 
+        private readonly IEndpointManager _endpointManager;
+        private readonly IRouter _router;
+
         public ServiceHubDispatcher(IServiceProtocol serviceProtocol,
             IServiceConnectionManager<THub> serviceConnectionManager,
             IClientConnectionManager clientConnectionManager,
-            IServiceEndpointProvider serviceEndpointProvider,
             IOptions<ServiceOptions> options,
             ILoggerFactory loggerFactory,
-            IClientConnectionFactory clientConnectionFactory)
+            IClientConnectionFactory clientConnectionFactory,
+            IEndpointManager endpointManager,
+            IRouter router)
         {
             _serviceProtocol = serviceProtocol;
             _serviceConnectionManager = serviceConnectionManager;
             _clientConnectionManager = clientConnectionManager;
-            _serviceEndpointProvider = serviceEndpointProvider;
             _options = options != null ? options.Value : throw new ArgumentNullException(nameof(options));
 
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _logger = loggerFactory.CreateLogger<ServiceHubDispatcher<THub>>();
             _clientConnectionFactory = clientConnectionFactory;
             _userId = GenerateServerName();
+            _endpointManager = endpointManager;
+            _router = router;
         }
 
         private static string GenerateServerName()
@@ -61,23 +73,25 @@ namespace Microsoft.Azure.SignalR
         public void Start(ConnectionDelegate connectionDelegate)
         {
             // Simply create a couple of connections which connect to Azure SignalR
-            var serviceConnection = new ServiceConnectionContainer(() => GetServiceConnection(connectionDelegate), _options.ConnectionCount);
-            _serviceConnectionManager.SetServiceConnection(serviceConnection);
+            var multiEndpointServiceConnection = new MultiEndpointServiceConnectionContainer(
+                endpoint => new ServiceConnectionContainer(() => GetServiceConnection(connectionDelegate, endpoint), _options.ConnectionCount),
+                _endpointManager, _router);
+            _serviceConnectionManager.SetServiceConnection(multiEndpointServiceConnection);
 
             Log.StartingConnection(_logger, Name, _options.ConnectionCount);
             _ = _serviceConnectionManager.StartAsync();
         }
 
-        private ServiceConnection GetServiceConnection(ConnectionDelegate connectionDelegate)
+        private ServiceConnection GetServiceConnection(ConnectionDelegate connectionDelegate, ServiceEndpoint endpoint)
         {
             return new ServiceConnection(_serviceProtocol, _clientConnectionManager, this,
                 _loggerFactory, connectionDelegate, _clientConnectionFactory,
-                Guid.NewGuid().ToString());
+                Guid.NewGuid().ToString(), endpoint);
         }
 
-        private Uri GetServiceUrl(string connectionId)
+        private Uri GetServiceUrl(string connectionId, IServiceEndpointProvider endpointProvider)
         {
-            var baseUri = new UriBuilder(_serviceEndpointProvider.GetServerEndpoint<THub>());
+            var baseUri = new UriBuilder(endpointProvider.GetServerEndpoint<THub>());
             var query = "cid=" + connectionId;
             if (baseUri.Query != null && baseUri.Query.Length > 1)
             {
@@ -90,12 +104,13 @@ namespace Microsoft.Azure.SignalR
             return baseUri.Uri;
         }
 
-        public async Task<ConnectionContext> ConnectAsync(TransferFormat transferFormat, string connectionId, CancellationToken cancellationToken = default)
+        public async Task<ConnectionContext> ConnectAsync(ServiceEndpoint endpoint, TransferFormat transferFormat, string connectionId, CancellationToken cancellationToken = default)
         {
+            var endpointProvider = endpoint.GetProvider(_options.AccessTokenLifetime);
             var httpConnectionOptions = new HttpConnectionOptions
             {
-                Url = GetServiceUrl(connectionId),
-                AccessTokenProvider = () => Task.FromResult(_serviceEndpointProvider.GenerateServerAccessToken<THub>(_userId)),
+                Url = GetServiceUrl(connectionId, endpointProvider),
+                AccessTokenProvider = () => Task.FromResult(endpointProvider.GenerateServerAccessToken<THub>(_userId)),
                 Transports = HttpTransportType.WebSockets,
                 SkipNegotiation = true,
                 Headers = CustomHeader

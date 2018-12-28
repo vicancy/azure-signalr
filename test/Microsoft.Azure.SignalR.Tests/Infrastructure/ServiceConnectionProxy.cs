@@ -46,7 +46,9 @@ namespace Microsoft.Azure.SignalR.Tests
                     NullLoggerFactory.Instance,
                     callback ?? OnConnectionAsync,
                     this,
-                    Guid.NewGuid().ToString("N"));
+                    Guid.NewGuid().ToString("N"),
+                    ServiceEndpoint.Empty
+                    );
             ServiceConnectionContainer = new ServiceConnectionContainer(
                 new List<IServiceConnection>()
                 {

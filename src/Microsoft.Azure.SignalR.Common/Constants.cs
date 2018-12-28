@@ -5,6 +5,9 @@ namespace Microsoft.Azure.SignalR
 {
     internal static class Constants
     {
+        public const string ConnectionStringDefaultKey = "Azure:SignalR:ConnectionString";
+        public const string ConnectionStringKeyPrefix = "Azure:SignalR:ConnectionString:";
+
         public static class ClaimType
         {
             public const string AzureSignalRSysPrefix = "asrs.s.";
