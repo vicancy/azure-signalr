@@ -33,9 +33,7 @@ namespace Microsoft.Azure.SignalR
             }
 
             var endpoints = new List<ServiceEndpoint>();
-            var children = configuration.GetChildren().ToList();
-            var kk = children.Where(s => s.Key.Contains("Azure")).ToList();
-            foreach(var section in configuration.GetChildren())
+            foreach(var section in configuration.AsEnumerable())
             {
                 if (string.Equals(section.Key, Constants.ConnectionStringDefaultKey, StringComparison.OrdinalIgnoreCase)
                     || string.Equals(section.Key, ConnectionStringSecondaryKey, StringComparison.OrdinalIgnoreCase)
