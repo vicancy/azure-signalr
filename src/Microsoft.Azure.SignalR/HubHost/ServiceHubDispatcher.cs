@@ -17,9 +17,9 @@ namespace Microsoft.Azure.SignalR
 {
     internal static class ServiceEndpointExtensions
     {
-        public static IServiceEndpointProvider GetProvider(this ServiceEndpoint endpoint, TimeSpan expire)
+        public static IServiceEndpointProvider GetProvider(this ServiceEndpoint endpoint)
         {
-            return new ServiceEndpointProvider(endpoint, expire);
+            return new ServiceEndpointProvider(endpoint, endpoint.Expire);
         }
     }
 
@@ -106,7 +106,7 @@ namespace Microsoft.Azure.SignalR
 
         public async Task<ConnectionContext> ConnectAsync(ServiceEndpoint endpoint, TransferFormat transferFormat, string connectionId, CancellationToken cancellationToken = default)
         {
-            var endpointProvider = endpoint.GetProvider(_options.AccessTokenLifetime);
+            var endpointProvider = endpoint.GetProvider();
             var httpConnectionOptions = new HttpConnectionOptions
             {
                 Url = GetServiceUrl(connectionId, endpointProvider),

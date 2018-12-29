@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Azure.SignalR
 {
@@ -10,6 +11,13 @@ namespace Microsoft.Azure.SignalR
     {
         private readonly IReadOnlyList<ServiceEndpoint> _availableEndpoints;
         private readonly IReadOnlyList<ServiceEndpoint> _primaryEndpoints;
+
+        public StaticEndpointManger(IOptions<ServiceOptions> options)
+        {
+            var endpoints = options.Value.Endpoints;
+            _availableEndpoints = endpoints;
+            _primaryEndpoints = endpoints;
+        }
 
         public StaticEndpointManger(IReadOnlyList<ServiceEndpoint> endpoints)
         {

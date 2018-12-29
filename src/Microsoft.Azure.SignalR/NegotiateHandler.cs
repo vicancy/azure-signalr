@@ -14,13 +14,15 @@ namespace Microsoft.Azure.SignalR
 {
     internal class NegotiateHandler
     {
-        private readonly IServiceEndpointProvider _endpointProvider;
+        private readonly IEndpointManager _endpointManager;
+        private readonly IRouter _router;
         private readonly IUserIdProvider _userIdProvider;
         private readonly Func<HttpContext, IEnumerable<Claim>> _claimsProvider;
 
-        public NegotiateHandler(IServiceEndpointProvider endpointProvider, IUserIdProvider userIdProvider, IOptions<ServiceOptions> options)
+        public NegotiateHandler(IEndpointManager endpointManager, IRouter router, IUserIdProvider userIdProvider, IOptions<ServiceOptions> options)
         {
-            _endpointProvider = endpointProvider ?? throw new ArgumentNullException(nameof(endpointProvider));
+            _endpointManager = endpointManager ?? throw new ArgumentNullException(nameof(endpointManager));
+            _router = router ?? throw new ArgumentNullException(nameof(router));
             _userIdProvider = userIdProvider ?? throw new ArgumentNullException(nameof(userIdProvider));
             _claimsProvider = options?.Value?.ClaimsProvider;
         }
@@ -30,11 +32,13 @@ namespace Microsoft.Azure.SignalR
             var claims = BuildClaims(context);
             var request = context.Request;
             var originalPath = GetOriginalPath(request.Path);
+            var endpoint = _router.GetNegotiateEndpoint(_endpointManager.GetPrimaryEndpoints());
+            var provider = endpoint.GetProvider();
             return new NegotiationResponse
             {
-                Url = _endpointProvider.GetClientEndpoint(hubName, originalPath,
+                Url = provider.GetClientEndpoint(hubName, originalPath,
                     request.QueryString.HasValue ? request.QueryString.Value.Substring(1) : string.Empty),
-                AccessToken = _endpointProvider.GenerateClientAccessToken(hubName, claims),
+                AccessToken = provider.GenerateClientAccessToken(hubName, claims),
                 // Need to set this even though it's technically protocol violation https://github.com/aspnet/SignalR/issues/2133
                 AvailableTransports = new List<AvailableTransport>()
             };

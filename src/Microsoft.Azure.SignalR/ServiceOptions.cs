@@ -42,5 +42,7 @@ namespace Microsoft.Azure.SignalR
         /// Default value is one hour.
         /// </summary>
         public TimeSpan AccessTokenLifetime { get; set; } = DefaultAccessTokenLifetime;
+
+        public ServiceEndpoint[] Endpoints { get; set; }
     }
 }

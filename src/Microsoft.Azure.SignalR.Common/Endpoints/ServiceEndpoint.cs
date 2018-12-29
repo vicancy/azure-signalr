@@ -7,6 +7,7 @@ namespace Microsoft.Azure.SignalR
 {
     public class ServiceEndpoint
     {
+        internal static readonly TimeSpan DefaultAccessTokenLifetime = TimeSpan.FromHours(1);
         internal static readonly ServiceEndpoint Empty = new ServiceEndpoint();
 
         public string ConnectionString { get; }
@@ -14,6 +15,8 @@ namespace Microsoft.Azure.SignalR
         public string Key { get; }
 
         public string Name { get; }
+
+        public TimeSpan Expire { get; } = DefaultAccessTokenLifetime;
 
         public EndpointType EndpointType { get; }
 
@@ -30,7 +33,23 @@ namespace Microsoft.Azure.SignalR
         // For test purpose
         internal ServiceEndpoint() { }
 
-        public ServiceEndpoint(string key, string connectionString)
+        internal ServiceEndpoint(ServiceEndpoint endpoint, TimeSpan? expire = null)
+        {
+            ConnectionString = endpoint.ConnectionString;
+            Key = endpoint.Key;
+            if (expire.HasValue)
+            {
+                Expire = expire.Value;
+            }
+            Endpoint = endpoint.Endpoint;
+            AccessKey = endpoint.AccessKey;
+            Version = endpoint.Version;
+            Port = endpoint.Port;
+            Name = endpoint.Name;
+            EndpointType = endpoint.EndpointType;
+        }
+
+        public ServiceEndpoint(string key, string connectionString, TimeSpan? expire = null)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -44,14 +63,19 @@ namespace Microsoft.Azure.SignalR
 
             ConnectionString = connectionString;
             Key = key;
+            if (expire.HasValue)
+            {
+                Expire = expire.Value;
+            }
+
             (Endpoint, AccessKey, Version, Port) = ConnectionStringParser.Parse(connectionString);
             (Name, EndpointType) = ParseKey(Key);
         }
 
         public override int GetHashCode()
         {
-            // cares about key only
-            return Key.GetHashCode();
+            // cares about connection string only
+            return ConnectionString.GetHashCode();
         }
 
         internal (string, EndpointType) ParseKey(string key)

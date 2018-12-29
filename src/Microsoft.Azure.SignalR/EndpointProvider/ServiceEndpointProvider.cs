@@ -42,30 +42,6 @@ namespace Microsoft.Azure.SignalR
             }
         }
 
-        public ServiceEndpointProvider(IOptions<ServiceOptions> options)
-        {
-            var connectionString = options.Value.ConnectionString;
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                throw new ArgumentException(ConnectionStringNotFound);
-            }
-
-            _accessTokenLifetime = options.Value.AccessTokenLifetime;
-
-            string version;
-            int? port;
-            (_endpoint, _accessKey, version, port) = ConnectionStringParser.Parse(connectionString);
-
-            if (version == null || version == PreviewVersion)
-            {
-                _generator = new PreviewServiceEndpointGenerator(_endpoint, _accessKey);
-            }
-            else
-            {
-                _generator = new DefaultServiceEndpointGenerator(_endpoint, _accessKey, version, port);
-            }
-        }
-
         public string GenerateClientAccessToken(string hubName, IEnumerable<Claim> claims = null, TimeSpan? lifetime = null, string requestId = null)
         {
             if (string.IsNullOrEmpty(hubName))

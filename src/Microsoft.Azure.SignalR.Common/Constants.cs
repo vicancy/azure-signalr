@@ -7,6 +7,7 @@ namespace Microsoft.Azure.SignalR
     {
         public const string ConnectionStringDefaultKey = "Azure:SignalR:ConnectionString";
         public const string ConnectionStringKeyPrefix = "Azure:SignalR:ConnectionString:";
+        public const string ConnectionStringsPrefix = "ConnectionStrings:";
 
         public static class ClaimType
         {
