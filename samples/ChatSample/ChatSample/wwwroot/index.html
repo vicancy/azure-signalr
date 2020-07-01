@@ -145,7 +145,7 @@
             }
 
             var connection = new signalR.HubConnectionBuilder()
-                        .withUrl('/chat')
+                        .withUrl('/chat?endpoint=8081')
                         .withHubProtocol(new signalR.protocols.msgpack.MessagePackHubProtocol())
                         .build();
                             

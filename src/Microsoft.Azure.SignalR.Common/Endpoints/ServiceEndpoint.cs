@@ -92,7 +92,7 @@ namespace Microsoft.Azure.SignalR
         public override int GetHashCode()
         {
             // We consider ServiceEndpoint with the same Endpoint (https://{signalr.endpoint}) as the unique identity
-            return (Endpoint, EndpointType, Name).GetHashCode();
+            return (Endpoint, EndpointType, Name, Port).GetHashCode();
         }
 
         public override bool Equals(object obj)
@@ -112,7 +112,7 @@ namespace Microsoft.Azure.SignalR
                 return false;
             }
 
-            return Endpoint == that.Endpoint && EndpointType == that.EndpointType && Name == that.Name;
+            return Endpoint == that.Endpoint && EndpointType == that.EndpointType && Name == that.Name && Port == that.Port;
         }
 
         internal static (string, EndpointType) ParseKey(string key)
