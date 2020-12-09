@@ -10,6 +10,7 @@ namespace ChatSample.CoreApp3
 {
     public class Startup
     {
+        public static IHubContext<Chat> HubContext = null;
         // This method gets called by the runtime. Use this method to add services to the container.
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
@@ -45,6 +46,8 @@ namespace ChatSample.CoreApp3
                 routes.MapHub<Chat>("/chat");
                 routes.MapHub<BenchHub>("/signalrbench");
             });
+
+            HubContext = app.ApplicationServices.GetService<IHubContext<Chat>>();
         }
     }
 }
