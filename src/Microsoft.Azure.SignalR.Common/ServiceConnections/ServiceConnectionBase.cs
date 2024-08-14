@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.SignalR
 {
-    internal abstract class ServiceConnectionBase : IServiceConnection
+    internal abstract class ServiceConnectionBase : IServiceConnection, IDisposable
     {
         protected static readonly TimeSpan DefaultHandshakeTimeout = TimeSpan.FromSeconds(15);
 
@@ -34,6 +34,8 @@ namespace Microsoft.Azure.SignalR
 
         private static readonly long DefaultKeepAliveTicks = (long)DefaultKeepAliveInterval.TotalSeconds * Stopwatch.Frequency;
 
+        private readonly CancellationTokenSource _closeCts = new CancellationTokenSource();
+
         private readonly ReadOnlyMemory<byte> _cachedPingBytes;
 
         private readonly HandshakeRequestMessage _handshakeRequest;
@@ -51,6 +53,9 @@ namespace Microsoft.Azure.SignalR
         private readonly IServiceEventHandler _serviceEventHandler;
 
         private readonly object _statusLock = new object();
+
+        // This is the tasks that should be completed before disposing the connection
+        private Task _cleanupTask;
 
         private volatile string _errorMessage;
 
@@ -168,7 +173,7 @@ namespace Microsoft.Azure.SignalR
                             syncTimer = new TimerAwaitable(TimeSpan.Zero, DefaultSyncAzureIdentityInterval);
                             _ = UpdateAzureIdentityAsync(key, syncTimer);
                         }
-                        await ProcessIncomingAsync(connection);
+                        await ProcessIncomingAsync(connection, _closeCts.Token);
                     }
                     finally
                     {
@@ -179,7 +184,8 @@ namespace Microsoft.Azure.SignalR
                         // TODO: Never cleanup connections unless Service asks us to do that
                         // Current implementation is based on assumption that Service will drop clients
                         // if server connection fails.
-                        await CleanupClientConnections();
+                        // store the cleanup task into a local var so that if we don't lose track of them
+                        _cleanupTask = await CleanupClientConnections();
                     }
                 }
                 catch (Exception ex)
@@ -188,6 +194,7 @@ namespace Microsoft.Azure.SignalR
                 }
                 finally
                 {
+                    _closeCts.Cancel();
                     // wait until all the connections are cleaned up to close the outgoing pipe
                     // mark the status as Disconnected so that no one will write to this connection anymore
                     // Don't allow write anymore when the connection is disconnected
@@ -272,9 +279,9 @@ namespace Microsoft.Azure.SignalR
 
         protected abstract Task DisposeConnection(ConnectionContext connection);
 
-        protected abstract Task CleanupClientConnections(string fromInstanceId = null);
+        protected abstract Task<Task> CleanupClientConnections(string fromInstanceId = null);
 
-        protected abstract Task OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage);
+        protected abstract Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage);
 
         protected abstract Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage);
 
@@ -502,7 +509,7 @@ namespace Microsoft.Azure.SignalR
             }
         }
 
-        private async Task ProcessIncomingAsync(ConnectionContext connection)
+        private async Task ProcessIncomingAsync(ConnectionContext connection, CancellationToken cancellationToken)
         {
             var keepAliveTimer = StartKeepAliveTimer();
 
@@ -510,7 +517,7 @@ namespace Microsoft.Azure.SignalR
             {
                 while (true)
                 {
-                    var result = await connection.Transport.Input.ReadAsync();
+                    var result = await connection.Transport.Input.ReadAsync(cancellationToken);
                     var buffer = result.Buffer;
 
                     try
@@ -532,7 +539,7 @@ namespace Microsoft.Azure.SignalR
 
                             while (ServiceProtocol.TryParseMessage(ref buffer, out var message))
                             {
-                                _ = DispatchMessageAsync(message);
+                                _ = DispatchMessageAsync(message, cancellationToken);
                             }
                         }
 
@@ -562,7 +569,7 @@ namespace Microsoft.Azure.SignalR
             }
         }
 
-        protected virtual Task DispatchMessageAsync(ServiceMessage message)
+        protected virtual Task DispatchMessageAsync(ServiceMessage message, CancellationToken cancellationToken)
         {
             return message switch
             {
@@ -644,6 +651,15 @@ namespace Microsoft.Azure.SignalR
         }
 
         protected virtual ReadOnlyMemory<byte> GetPingMessage() => _cachedPingBytes;
+
+        public void Dispose()
+        {
+            // Dispose should happen after cleanup task is done
+            if (_cleanupTask != null && !_cleanupTask.IsCompleted)
+            {
+                _cleanupTask.GetAwaiter().GetResult();
+            }
+        }
 
         private static class Log
         {

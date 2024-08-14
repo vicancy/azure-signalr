@@ -54,6 +54,11 @@ namespace Microsoft.Azure.SignalR.IntegrationTests.Infrastructure
             return t;
         }
 
+        public void Dispose()
+        {
+            _serviceConnection.Dispose();
+        }
+
         public event Action<StatusChange> ConnectionStatusChanged
         {
             add => _serviceConnection.ConnectionStatusChanged += value;

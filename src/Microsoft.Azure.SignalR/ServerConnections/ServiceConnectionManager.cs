@@ -57,6 +57,7 @@ namespace Microsoft.Azure.SignalR
         public void Dispose()
         {
             StopAsync().GetAwaiter().GetResult();
+            _serviceConnection.Dispose();
         }
     }
 }

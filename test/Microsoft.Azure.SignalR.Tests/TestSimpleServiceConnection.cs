@@ -51,5 +51,9 @@ namespace Microsoft.Azure.SignalR.Tests
             _writeAsyncTcs?.TrySetResult(null);
             return Task.CompletedTask;
         }
+
+        public void Dispose()
+        {
+        }
     }
 }

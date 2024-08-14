@@ -269,6 +269,10 @@ namespace Microsoft.Azure.SignalR.Tests
                 }
                 return Task.CompletedTask;
             }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

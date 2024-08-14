@@ -7,7 +7,7 @@ using Microsoft.Azure.SignalR.Protocol;
 
 namespace Microsoft.Azure.SignalR
 {
-    internal interface IServiceConnection
+    internal interface IServiceConnection : IDisposable
     {
         Task StartAsync(string target = null);
 

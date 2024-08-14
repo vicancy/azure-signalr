@@ -262,6 +262,10 @@ namespace Microsoft.Azure.SignalR
         public void Dispose()
         {
             StopAsync().GetAwaiter().GetResult();
+            foreach (var i in ServiceConnections)
+            {
+                i.Dispose();
+            }
             _statusPing.Dispose();
             _serversPing.Dispose();
             Dispose(true);
@@ -420,6 +424,11 @@ namespace Microsoft.Azure.SignalR
 
             Func<Task<bool>> tryNewConnection = async () =>
             {
+                if (_terminated)
+                {
+                    return true;
+                }
+
                 var connection = CreateServiceConnectionCore(InitialConnectionType);
                 ReplaceFixedConnection(index, connection);
 

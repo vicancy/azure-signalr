@@ -78,13 +78,13 @@ namespace Microsoft.Azure.SignalR.AspNet
         /// </summary>
         /// <param name="fromInstanceId">Specifies which Azure SignalR instance is the client connections come from, null means all</param>
         /// <returns></returns>
-        protected override Task CleanupClientConnections(string fromInstanceId = null)
+        protected override Task<Task> CleanupClientConnections(string fromInstanceId = null)
         {
-            _ = CleanupConnectionsAsyncCore(fromInstanceId);
-            return Task.CompletedTask;
+            var task = CleanupConnectionsAsyncCore(fromInstanceId);
+            return Task.FromResult(task);
         }
 
-        protected override Task OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
         {
             // Create empty transport with only channel for async processing messages
             var connectionId = openConnectionMessage.ConnectionId;
@@ -104,14 +104,14 @@ namespace Microsoft.Azure.SignalR.AspNet
                 {
                     _clientConnections.TryAdd(connectionId, clientContext);
                     clientContext.ApplicationTask = ProcessMessageAsync(clientContext, clientContext.CancellationToken);
-                    return ForwardMessageToApplication(connectionId, openConnectionMessage);
+                    return Task.FromResult(ForwardMessageToApplication(connectionId, openConnectionMessage));
                 }
                 else
                 {
                     // the manager still contains this connectionId, probably this connection is not yet cleaned up
                     Log.DuplicateConnectionId(Logger, connectionId, null);
-                    return SafeWriteAsync(
-                        new CloseConnectionMessage(connectionId, $"Duplicate connection ID {connectionId}"));
+                    return Task.FromResult<Task>(SafeWriteAsync(
+                        new CloseConnectionMessage(connectionId, $"Duplicate connection ID {connectionId}")));
                 }
             }
         }

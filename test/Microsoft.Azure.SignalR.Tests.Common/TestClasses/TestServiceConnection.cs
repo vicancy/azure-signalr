@@ -59,9 +59,9 @@ namespace Microsoft.Azure.SignalR.Tests.Common
             _connection?.Transport.Input.CancelPendingRead();
         }
 
-        protected override Task CleanupClientConnections(string fromInstanceId = null)
+        protected override Task<Task> CleanupClientConnections(string fromInstanceId = null)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(Task.CompletedTask);
         }
 
         protected override Task<ConnectionContext> CreateConnection(string target = null)
@@ -90,9 +90,9 @@ namespace Microsoft.Azure.SignalR.Tests.Common
             await Task.Yield();
             return _expectedStatus == ServiceConnectionStatus.Connected;
         }
-        protected override Task OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(Task.CompletedTask);
         }
 
         protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage)

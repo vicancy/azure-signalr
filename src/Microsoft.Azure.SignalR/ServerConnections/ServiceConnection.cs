@@ -97,27 +97,21 @@ namespace Microsoft.Azure.SignalR
 
         protected override Task DisposeConnection(ConnectionContext connection)
         {
+            // when disposing the connection, make sure all the client connections still belongs to this connection to be cleaned or migrated
             return _connectionFactory.DisposeAsync(connection);
         }
 
-        protected override Task CleanupClientConnections(string fromInstanceId = null)
+        protected override Task<Task> CleanupClientConnections(string fromInstanceId = null)
         {
             // To gracefully complete client connections, let the client itself owns the connection lifetime
+            var connectionIds = fromInstanceId == null ? _connectionIds.Keys : _connectionIds.Where(s => s.Value == fromInstanceId).Select(s => s.Key);
 
-            foreach (var connection in _connectionIds)
+            return Task.FromResult(Task.WhenAll(connectionIds.Select(connection =>
             {
-                if (!string.IsNullOrEmpty(fromInstanceId) && connection.Value != fromInstanceId)
-                {
-                    continue;
-                }
+                _bufferingMessages.Remove(connection);
+                return PerformDisconnectAsyncCore(connection);
 
-                // make sure there is no await operation before _bufferingMessages.
-                _bufferingMessages.Remove(connection.Key);
-                // We should not wait until all the clients' lifetime ends to restart another service connection
-                _ = PerformDisconnectAsyncCore(connection.Key);
-            }
-
-            return Task.CompletedTask;
+            })));
         }
 
         protected override ReadOnlyMemory<byte> GetPingMessage()
@@ -132,7 +126,7 @@ namespace Microsoft.Azure.SignalR
                 });
         }
 
-        protected override Task OnClientConnectedAsync(OpenConnectionMessage message)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage message)
         {
             var connection = _clientConnectionFactory.CreateConnection(message, ConfigureContext);
             connection.ServiceConnection = this;
@@ -151,9 +145,10 @@ namespace Microsoft.Azure.SignalR
                 isDiagnosticClient = Convert.ToBoolean(isDiagnosticClientValue.FirstOrDefault());
             }
 
+            Task clientProcessTask;
             using (new ClientConnectionScope(endpoint: HubEndpoint, outboundConnection: this, isDiagnosticClient: isDiagnosticClient))
             {
-                _ = ProcessClientConnectionAsync(connection, _hubProtocolResolver.GetProtocol(message.Protocol, null));
+                clientProcessTask = ProcessClientConnectionAsync(connection, _hubProtocolResolver.GetProtocol(message.Protocol, null));
             }
 
             if (connection.IsMigrated)
@@ -165,7 +160,7 @@ namespace Microsoft.Azure.SignalR
                 Log.ConnectedStarting(Logger, connection.ConnectionId);
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(clientProcessTask);
         }
 
         protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage)
@@ -492,11 +487,6 @@ namespace Microsoft.Azure.SignalR
                 // Wait for the application task to complete
                 // application task can end when exception, or Context.Abort() from hub
                 await _connectionDelegate(connection);
-            }
-            catch (ObjectDisposedException)
-            {
-                // When the application shuts down and disposes IServiceProvider, HubConnectionHandler.RunHubAsync is still running and runs into _dispatcher.OnDisconnectedAsync
-                // no need to throw the error out
             }
             catch (Exception ex)
             {
