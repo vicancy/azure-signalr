@@ -543,15 +543,16 @@ namespace Microsoft.Azure.SignalR.Tests
                 return ValueTask.CompletedTask;
             }
 
-            protected override async Task OnClientConnectedAsync(OpenConnectionMessage message)
+            protected override async Task<Task> OnClientConnectedAsync(OpenConnectionMessage message, CancellationToken cancellationToken)
             {
-                await base.OnClientConnectedAsync(message);
+                var t = await base.OnClientConnectedAsync(message, cancellationToken);
                 _clientConnectedTcs.TrySetResult();
+                return t;
             }
 
-            protected override async Task OnClientDisconnectedAsync(CloseConnectionMessage message)
+            protected override async Task OnClientDisconnectedAsync(CloseConnectionMessage message, CancellationToken cancellationToken)
             {
-                await base.OnClientDisconnectedAsync(message);
+                await base.OnClientDisconnectedAsync(message, cancellationToken);
                 _clientDisconnectedTcs.TrySetResult();
             }
 

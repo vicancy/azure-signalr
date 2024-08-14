@@ -68,7 +68,7 @@ namespace Microsoft.Azure.SignalR.AspNet
                 headers: CustomHeader);
         }
 
-        protected override Task DisposeConnection(ConnectionContext connection)
+        protected override Task DisposeConnection(ConnectionContext connection, CancellationToken cancellationToken)
         {
             return _connectionFactory.DisposeAsync(connection);
         }
@@ -84,7 +84,7 @@ namespace Microsoft.Azure.SignalR.AspNet
             return Task.FromResult(task);
         }
 
-        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage, CancellationToken cancellationToken)
         {
             // Create empty transport with only channel for async processing messages
             var connectionId = openConnectionMessage.ConnectionId;
@@ -116,12 +116,12 @@ namespace Microsoft.Azure.SignalR.AspNet
             }
         }
 
-        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage)
+        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage, CancellationToken cancellationToken)
         {
             return ForwardMessageToApplication(closeConnectionMessage.ConnectionId, closeConnectionMessage);
         }
 
-        protected override Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage)
+        protected override Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage, CancellationToken cancellationToken)
         {
             if (connectionDataMessage.TracingId != null)
             {

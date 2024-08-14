@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Azure.SignalR.Protocol;
@@ -79,7 +80,7 @@ namespace Microsoft.Azure.SignalR.Tests.Common
             });
         }
 
-        protected override Task DisposeConnection(ConnectionContext connection)
+        protected override Task DisposeConnection(ConnectionContext connection, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
@@ -90,17 +91,17 @@ namespace Microsoft.Azure.SignalR.Tests.Common
             await Task.Yield();
             return _expectedStatus == ServiceConnectionStatus.Connected;
         }
-        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage, CancellationToken cancellationToken)
         {
             return Task.FromResult(Task.CompletedTask);
         }
 
-        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage)
+        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        protected override Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage)
+        protected override Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

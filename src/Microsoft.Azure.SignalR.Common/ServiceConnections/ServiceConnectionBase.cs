@@ -204,7 +204,7 @@ namespace Microsoft.Azure.SignalR
                     try
                     {
                         // close the underlying connection
-                        await DisposeConnection(connection);
+                        await DisposeConnection(connection, default);
                     }
                     finally
                     {
@@ -277,17 +277,17 @@ namespace Microsoft.Azure.SignalR
 
         protected abstract Task<ConnectionContext> CreateConnection(string target = null);
 
-        protected abstract Task DisposeConnection(ConnectionContext connection);
+        protected abstract Task DisposeConnection(ConnectionContext connection, CancellationToken cancellationToken);
 
         protected abstract Task<Task> CleanupClientConnections(string fromInstanceId = null);
 
-        protected abstract Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage);
+        protected abstract Task<Task> OnClientConnectedAsync(OpenConnectionMessage openConnectionMessage, CancellationToken cancellationToken);
 
-        protected abstract Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage);
+        protected abstract Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage, CancellationToken cancellationToken);
 
-        protected abstract Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage);
+        protected abstract Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage, CancellationToken cancellationToken);
 
-        protected Task OnServiceErrorAsync(ServiceErrorMessage serviceErrorMessage)
+        protected Task OnServiceErrorAsync(ServiceErrorMessage serviceErrorMessage, CancellationToken cancellationToken)
         {
             if (!string.IsNullOrEmpty(serviceErrorMessage.ErrorMessage))
             {
@@ -305,7 +305,7 @@ namespace Microsoft.Azure.SignalR
             return Task.CompletedTask;
         }
 
-        protected virtual Task OnPingMessageAsync(PingMessage pingMessage)
+        protected virtual Task OnPingMessageAsync(PingMessage pingMessage, CancellationToken cancellationToken)
         {
             if (RuntimeServicePingMessage.IsEchoMessage(pingMessage))
             {
@@ -324,19 +324,19 @@ namespace Microsoft.Azure.SignalR
             return _serviceMessageHandler.HandlePingAsync(pingMessage);
         }
 
-        protected Task OnAckMessageAsync(AckMessage ackMessage)
+        protected Task OnAckMessageAsync(AckMessage ackMessage, CancellationToken cancellationToken)
         {
             _serviceMessageHandler.HandleAck(ackMessage);
             return Task.CompletedTask;
         }
 
-        private Task OnEventMessageAsync(ServiceEventMessage message)
+        private Task OnEventMessageAsync(ServiceEventMessage message, CancellationToken cancellationToken)
         {
             _ = _serviceEventHandler?.HandleAsync(ConnectionId, message);
             return Task.CompletedTask;
         }
 
-        private Task OnAccessKeyMessageAsync(AccessKeyResponseMessage keyMessage)
+        private Task OnAccessKeyMessageAsync(AccessKeyResponseMessage keyMessage, CancellationToken cancellationToken)
         {
             if (HubEndpoint.AccessKey is AccessKeyForMicrosoftEntra key)
             {
@@ -369,12 +369,12 @@ namespace Microsoft.Azure.SignalR
                 catch (Exception ex)
                 {
                     Log.HandshakeError(Logger, _endpointName, ex.Message, ConnectionId);
-                    await DisposeConnection(connectionContext);
+                    await DisposeConnection(connectionContext, default);
                     return null;
                 }
 
                 // handshake return false
-                await DisposeConnection(connectionContext);
+                await DisposeConnection(connectionContext, default);
 
                 return null;
             }
@@ -573,14 +573,14 @@ namespace Microsoft.Azure.SignalR
         {
             return message switch
             {
-                OpenConnectionMessage openConnectionMessage => OnClientConnectedAsync(openConnectionMessage),
-                CloseConnectionMessage closeConnectionMessage => OnClientDisconnectedAsync(closeConnectionMessage),
-                ConnectionDataMessage connectionDataMessage => OnClientMessageAsync(connectionDataMessage),
-                ServiceErrorMessage serviceErrorMessage => OnServiceErrorAsync(serviceErrorMessage),
-                PingMessage pingMessage => OnPingMessageAsync(pingMessage),
-                AckMessage ackMessage => OnAckMessageAsync(ackMessage),
-                ServiceEventMessage eventMessage => OnEventMessageAsync(eventMessage),
-                AccessKeyResponseMessage keyMessage => OnAccessKeyMessageAsync(keyMessage),
+                OpenConnectionMessage openConnectionMessage => OnClientConnectedAsync(openConnectionMessage, cancellationToken),
+                CloseConnectionMessage closeConnectionMessage => OnClientDisconnectedAsync(closeConnectionMessage, cancellationToken),
+                ConnectionDataMessage connectionDataMessage => OnClientMessageAsync(connectionDataMessage, cancellationToken),
+                ServiceErrorMessage serviceErrorMessage => OnServiceErrorAsync(serviceErrorMessage, cancellationToken),
+                PingMessage pingMessage => OnPingMessageAsync(pingMessage, cancellationToken),
+                AckMessage ackMessage => OnAckMessageAsync(ackMessage, cancellationToken),
+                ServiceEventMessage eventMessage => OnEventMessageAsync(eventMessage, cancellationToken),
+                AccessKeyResponseMessage keyMessage => OnAccessKeyMessageAsync(keyMessage, cancellationToken),
                 _ => Task.CompletedTask,
             };
         }

@@ -95,7 +95,7 @@ namespace Microsoft.Azure.SignalR
             return _connectionFactory.ConnectAsync(HubEndpoint, TransferFormat.Binary, ConnectionId, target, headers: CustomHeader);
         }
 
-        protected override Task DisposeConnection(ConnectionContext connection)
+        protected override Task DisposeConnection(ConnectionContext connection, CancellationToken cancellationToken)
         {
             // when disposing the connection, make sure all the client connections still belongs to this connection to be cleaned or migrated
             return _connectionFactory.DisposeAsync(connection);
@@ -126,7 +126,7 @@ namespace Microsoft.Azure.SignalR
                 });
         }
 
-        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage message)
+        protected override Task<Task> OnClientConnectedAsync(OpenConnectionMessage message, CancellationToken cancellationToken)
         {
             var connection = _clientConnectionFactory.CreateConnection(message, ConfigureContext);
             connection.ServiceConnection = this;
@@ -148,7 +148,7 @@ namespace Microsoft.Azure.SignalR
             Task clientProcessTask;
             using (new ClientConnectionScope(endpoint: HubEndpoint, outboundConnection: this, isDiagnosticClient: isDiagnosticClient))
             {
-                clientProcessTask = ProcessClientConnectionAsync(connection, _hubProtocolResolver.GetProtocol(message.Protocol, null));
+                clientProcessTask = ProcessClientConnectionAsync(connection, _hubProtocolResolver.GetProtocol(message.Protocol, null), cancellationToken);
             }
 
             if (connection.IsMigrated)
@@ -163,7 +163,7 @@ namespace Microsoft.Azure.SignalR
             return Task.FromResult(clientProcessTask);
         }
 
-        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage)
+        protected override Task OnClientDisconnectedAsync(CloseConnectionMessage closeConnectionMessage, CancellationToken cancellationToken)
         {
             var connectionId = closeConnectionMessage.ConnectionId;
             // make sure there is no await operation before _bufferingMessages.
@@ -187,7 +187,7 @@ namespace Microsoft.Azure.SignalR
             return PerformDisconnectAsyncCore(connectionId);
         }
 
-        protected override async Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage)
+        protected override async Task OnClientMessageAsync(ConnectionDataMessage connectionDataMessage, CancellationToken cancellationToken)
         {
             if (connectionDataMessage.TracingId != null)
             {
@@ -256,21 +256,21 @@ namespace Microsoft.Azure.SignalR
             }
         }
 
-        protected override Task DispatchMessageAsync(ServiceMessage message)
+        protected override Task DispatchMessageAsync(ServiceMessage message, CancellationToken cancellationToken)
         {
             return message switch
             {
-                PingMessage pingMessage => OnPingMessageAsync(pingMessage),
-                ClientInvocationMessage clientInvocationMessage => OnClientInvocationAsync(clientInvocationMessage),
-                ServiceMappingMessage serviceMappingMessage => OnServiceMappingAsync(serviceMappingMessage),
-                ClientCompletionMessage clientCompletionMessage => OnClientCompletionAsync(clientCompletionMessage),
-                ErrorCompletionMessage errorCompletionMessage => OnErrorCompletionAsync(errorCompletionMessage),
-                ConnectionReconnectMessage connectionReconnectMessage => OnConnectionReconnectAsync(connectionReconnectMessage),
-                _ => base.DispatchMessageAsync(message)
+                PingMessage pingMessage => OnPingMessageAsync(pingMessage, cancellationToken),
+                ClientInvocationMessage clientInvocationMessage => OnClientInvocationAsync(clientInvocationMessage, cancellationToken),
+                ServiceMappingMessage serviceMappingMessage => OnServiceMappingAsync(serviceMappingMessage, cancellationToken),
+                ClientCompletionMessage clientCompletionMessage => OnClientCompletionAsync(clientCompletionMessage, cancellationToken),
+                ErrorCompletionMessage errorCompletionMessage => OnErrorCompletionAsync(errorCompletionMessage, cancellationToken),
+                ConnectionReconnectMessage connectionReconnectMessage => OnConnectionReconnectAsync(connectionReconnectMessage, cancellationToken),
+                _ => base.DispatchMessageAsync(message, cancellationToken)
             };
         }
 
-        protected override Task OnPingMessageAsync(PingMessage pingMessage)
+        protected override Task OnPingMessageAsync(PingMessage pingMessage, CancellationToken cancellationToken)
         {
 #if NET7_0_OR_GREATER
             if (RuntimeServicePingMessage.TryGetOffline(pingMessage, out var instanceId))
@@ -281,15 +281,17 @@ namespace Microsoft.Azure.SignalR
                 // In `base.OnPingMessageAsync`, `CleanupClientConnections(instanceId)` will finally execute `RemoveClientConnection` for each ConnectionId.
             }
 #endif
-            return base.OnPingMessageAsync(pingMessage);
+            return base.OnPingMessageAsync(pingMessage, cancellationToken);
         }
 
-        private async Task ProcessClientConnectionAsync(ClientConnectionContext connection, SignalRProtocol.IHubProtocol protocol)
+        private async Task ProcessClientConnectionAsync(ClientConnectionContext connection, SignalRProtocol.IHubProtocol protocol, CancellationToken cancellationToken)
         {
             try
             {
+                var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, connection.OutgoingAborted);
+
                 // Writing from the application to the service
-                var transport = ProcessOutgoingMessagesAsync(connection, protocol, connection.OutgoingAborted);
+                var transport = ProcessOutgoingMessagesAsync(connection, protocol, linked.Token);
 
                 // Waiting for the application to shutdown so we can clean up the connection
                 var app = ProcessApplicationTaskAsyncCore(connection);
@@ -540,31 +542,31 @@ namespace Microsoft.Azure.SignalR
             return connection;
         }
 
-        private Task OnClientInvocationAsync(ClientInvocationMessage message)
+        private Task OnClientInvocationAsync(ClientInvocationMessage message, CancellationToken cancellationToken)
         {
             _clientInvocationManager.Router.AddInvocation(message.ConnectionId, message.InvocationId, message.CallerServerId, default);
             return Task.CompletedTask;
         }
 
-        private Task OnServiceMappingAsync(ServiceMappingMessage message)
+        private Task OnServiceMappingAsync(ServiceMappingMessage message, CancellationToken cancellationToken)
         {
             _clientInvocationManager.Caller.AddServiceMapping(message);
             return Task.CompletedTask;
         }
 
-        private Task OnClientCompletionAsync(ClientCompletionMessage clientCompletionMessage)
+        private Task OnClientCompletionAsync(ClientCompletionMessage clientCompletionMessage, CancellationToken cancellationToken)
         {
             _clientInvocationManager.Caller.TryCompleteResult(clientCompletionMessage.ConnectionId, clientCompletionMessage);
             return Task.CompletedTask;
         }
 
-        private Task OnErrorCompletionAsync(ErrorCompletionMessage errorCompletionMessage)
+        private Task OnErrorCompletionAsync(ErrorCompletionMessage errorCompletionMessage, CancellationToken cancellationToken)
         {
             _clientInvocationManager.Caller.TryCompleteResult(errorCompletionMessage.ConnectionId, errorCompletionMessage);
             return Task.CompletedTask;
         }
 
-        private Task OnConnectionReconnectAsync(ConnectionReconnectMessage connectionReconnectMessage)
+        private Task OnConnectionReconnectAsync(ConnectionReconnectMessage connectionReconnectMessage, CancellationToken cancellationToken)
         {
             // make sure there is no await operation before _bufferingMessages.
             _bufferingMessages.Remove(connectionReconnectMessage.ConnectionId);
