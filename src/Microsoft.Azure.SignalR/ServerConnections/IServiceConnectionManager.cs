@@ -18,6 +18,8 @@ internal interface IServiceConnectionManager<THub> where THub : Hub
 
     Task OfflineAsync(GracefulShutdownMode mode);
 
+    Task CloseClientConnections();
+
     Task WriteAsync(ServiceMessage seviceMessage);
 
     Task<bool> WriteAckableMessageAsync(ServiceMessage seviceMessage, CancellationToken cancellationToken = default);

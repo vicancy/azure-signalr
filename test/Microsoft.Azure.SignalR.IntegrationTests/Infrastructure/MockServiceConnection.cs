@@ -64,4 +64,9 @@ internal class MockServiceConnection : IServiceConnection
         await WriteAsync(serviceMessage);
         return true;
     }
+
+    public Task CloseClientConnections()
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -21,6 +21,8 @@ internal interface IServiceConnection
 
     Task ConnectionOfflineTask { get; }
 
+    Task CloseClientConnections();
+
     event Action<StatusChange> ConnectionStatusChanged;
 
     Task StartAsync(string? target = null);

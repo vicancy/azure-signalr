@@ -110,6 +110,11 @@ internal partial class ServiceConnection : ServiceConnectionBase
         return _connectionFactory.DisposeAsync(connection);
     }
 
+    public override Task CloseClientConnections()
+    {
+        return Task.WhenAll(_clientConnectionManager.ClientConnections.Select(i => ((ClientConnectionContext)i).PerformDisconnectAsync()));
+    }
+
     protected override Task CleanupClientConnections(string fromInstanceId = null)
     {
         // To gracefully complete client connections, let the client itself owns the connection lifetime

@@ -140,6 +140,11 @@ namespace Microsoft.Azure.SignalR
             return Task.WhenAll(_routerEndpoints.endpoints.Select(c => c.ConnectionContainer.OfflineAsync(mode)));
         }
 
+        public Task CloseClientConnections()
+        {
+            return Task.WhenAll(_routerEndpoints.endpoints.Select(c => c.ConnectionContainer.CloseClientConnections()));
+        }
+
         public Task WriteAsync(ServiceMessage serviceMessage)
         {
             return CreateMessageWriter(serviceMessage).WriteAsync(serviceMessage);

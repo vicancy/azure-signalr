@@ -96,6 +96,11 @@ internal class ServiceConnectionManager : IServiceConnectionManager
         return Task.WhenAll(GetConnections().Select(s => s.OfflineAsync(mode)));
     }
 
+    public Task CloseClientConnections()
+    {
+        return Task.WhenAll(GetConnections().Select(s => s.CloseClientConnections()));
+    }
+
     public IServiceConnectionContainer WithHub(string hubName)
     {
         if (_hubConnections == null || !_hubConnections.TryGetValue(hubName, out var connection))

@@ -234,6 +234,11 @@ namespace Microsoft.Azure.SignalR
 
         public Task StopGetServersPing() => throw new NotSupportedException();
 
+        public Task CloseClientConnections()
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion Not supported method or properties
     }
 }

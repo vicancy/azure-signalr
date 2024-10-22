@@ -129,6 +129,29 @@ internal class ServiceHubDispatcher<THub> where THub : Hub
         var options = _options.GracefulShutdown;
         if (options.Mode == GracefulShutdownMode.Off)
         {
+            var source = new CancellationTokenSource(_options.GracefulShutdown.Timeout);
+
+            Log.SettingServerOffline(_logger, _hubName);
+
+            await Task.WhenAny(
+                _serviceConnectionManager.OfflineAsync(GracefulShutdownMode.WaitForClientsClose),
+                Task.Delay(Timeout.InfiniteTimeSpan, source.Token)
+            );
+
+            await Task.WhenAny(
+                _serviceConnectionManager.CloseClientConnections(),
+                Task.Delay(Timeout.InfiniteTimeSpan, source.Token)
+            );
+
+            Log.WaitingClientConnectionsToClose(_logger, _hubName);
+
+            await Task.WhenAny(
+                _clientConnectionManager.WhenAllCompleted(),
+                Task.Delay(Timeout.InfiniteTimeSpan, source.Token)
+            );
+
+            Log.StoppingServer(_logger, _hubName);
+            await _serviceConnectionManager.StopAsync();
             return;
         }
 
