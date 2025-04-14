@@ -7,7 +7,26 @@
     <TargetFramework>net462</TargetFramework>
     <!-- jQuery is not used in this library, upgrading jQuery to 3.x might potentially break users using 1.x, so ignore this warning -->
     <WarningsNotAsErrors>NU1902</WarningsNotAsErrors>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WarningsAsErrors>false</WarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Shared\NewFolder\**" />
+    <EmbeddedResource Remove="Shared\NewFolder\**" />
+    <None Remove="Shared\NewFolder\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Microsoft.Azure.SignalR.Common\**\*.cs" Exclude="..\Microsoft.Azure.SignalR.Common\obj\**\*">
+      <Link>Shared\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="..\Microsoft.Azure.SignalR.Common\Utilities\Rest\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="..\Microsoft.Azure.SignalR.Common\Endpoints\IConfigurationExtension.cs" />
+    <Compile Remove="..\Microsoft.Azure.SignalR.Common\Utilities\RestClient.cs" />
+  </ItemGroup>
   
   <ItemGroup>
     <!-- Directly reference Microsoft.Owin 4.x for security fix -->
@@ -20,7 +39,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Microsoft.Azure.SignalR.Protocols\Microsoft.Azure.SignalR.Protocols.csproj" />
-    <ProjectReference Include="..\Microsoft.Azure.SignalR.Common\Microsoft.Azure.SignalR.Common.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

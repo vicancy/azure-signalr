@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 /*------------------------------------------------------------------------------
@@ -21,25 +21,25 @@ namespace Microsoft.Azure.SignalR
     /// </summary>
     internal static class Base64UrlEncoder
     {
-        private const char base64PadCharacter = '=';
+        private const char Base64PadCharacter = '=';
 #if NET45
         private const string doubleBase64PadCharacter = "==";
 #endif
-        private const char base64Character62 = '+';
-        private const char base64Character63 = '/';
-        private const char base64UrlCharacter62 = '-';
-        private const char base64UrlCharacter63 = '_';
+        private const char Base64Character62 = '+';
+        private const char Base64Character63 = '/';
+        private const char Base64UrlCharacter62 = '-';
+        private const char Base64UrlCharacter63 = '_';
 
         /// <summary>
         /// Encoding table
         /// </summary>
-        internal static readonly char[] s_base64Table =
+        internal static readonly char[] Base64Table =
         {
             'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
             'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
             '0','1','2','3','4','5','6','7','8','9',
-            base64UrlCharacter62,
-            base64UrlCharacter63
+            Base64UrlCharacter62,
+            Base64UrlCharacter63
         };
 
         /// <summary>
@@ -72,23 +72,31 @@ namespace Microsoft.Azure.SignalR
             _ = inArray ?? throw LogHelper.LogArgumentNullException(nameof(inArray));
 
             if (length == 0)
+            {
                 return string.Empty;
+            }
 
             // Modifications 1 starts from here
             if (length < 0)
+            {
                 throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(LogHelper.FormatInvariant("IDX10106: The parameter {0} had an invalid value: '{1}'.", nameof(length), length)));
-            
+            }
+
             if (offset < 0 || inArray.Length < offset)
+            {
                 throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(LogHelper.FormatInvariant("IDX10106: The parameter {0} had an invalid value: '{1}'.", nameof(offset), offset)));
+            }
 
             if (inArray.Length < offset + length)
+            {
                 throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(LogHelper.FormatInvariant("IDX10106: The parameter {0} had an invalid value: '{1}'.", nameof(length), length)));
+            }
             // Modifications 1 ends here
 
             int lengthmod3 = length % 3;
             int limit = offset + (length - lengthmod3);
             char[] output = new char[(length + 2) / 3 * 4];
-            char[] table = s_base64Table;
+            char[] table = Base64Table;
             int i, j = 0;
 
             // takes 3 bytes from inArray and insert 4 bytes into output
@@ -208,20 +216,22 @@ namespace Microsoft.Azure.SignalR
         }
 
 #if !NET45
-        private unsafe static byte[] UnsafeDecode(string str)
+        private static unsafe byte[] UnsafeDecode(string str)
         {
             int mod = str.Length % 4;
             if (mod == 1)
+            {
                 // Modification 2 starts here
                 throw LogHelper.LogExceptionMessage(new FormatException(LogHelper.FormatInvariant("IDX10400: Unable to decode: '{0}' as Base64url encoded string.", str)));
-                // Modification 2 ends here
+            }
+            // Modification 2 ends here
 
             bool needReplace = false;
             int decodedLength = str.Length + (4 - mod) % 4;
 
             for (int i = 0; i < str.Length; i++)
             {
-                if (str[i] == base64UrlCharacter62 || str[i] == base64UrlCharacter63)
+                if (str[i] == Base64UrlCharacter62 || str[i] == Base64UrlCharacter63)
                 {
                     needReplace = true;
                     break;
@@ -236,16 +246,24 @@ namespace Microsoft.Azure.SignalR
                     int i = 0;
                     for (; i < str.Length; i++)
                     {
-                        if (str[i] == base64UrlCharacter62)
-                            dest[i] = base64Character62;
-                        else if (str[i] == base64UrlCharacter63)
-                            dest[i] = base64Character63;
+                        if (str[i] == Base64UrlCharacter62)
+                        {
+                            dest[i] = Base64Character62;
+                        }
+                        else if (str[i] == Base64UrlCharacter63)
+                        {
+                            dest[i] = Base64Character63;
+                        }
                         else
+                        {
                             dest[i] = str[i];
+                        }
                     }
 
                     for (; i < decodedLength; i++)
-                        dest[i] = base64PadCharacter;
+                    {
+                        dest[i] = Base64PadCharacter;
+                    }
                 }
 
                 return Convert.FromBase64String(decodedString);
@@ -263,9 +281,11 @@ namespace Microsoft.Azure.SignalR
                     fixed (char* dest = decodedString)
                     {
                         Buffer.MemoryCopy(src, dest, str.Length * 2, str.Length * 2);
-                        dest[str.Length] = base64PadCharacter;
+                        dest[str.Length] = Base64PadCharacter;
                         if (str.Length + 2 == decodedLength)
-                            dest[str.Length + 1] = base64PadCharacter;
+                        {
+                            dest[str.Length + 1] = Base64PadCharacter;
+                        }
                     }
 
                     return Convert.FromBase64String(decodedString);
